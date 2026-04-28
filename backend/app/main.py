@@ -1,3 +1,4 @@
+<<<<<<<< f8193069009012b070d8edb398d820b8b8207c6d:backend/app/main.py
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -33,3 +34,6 @@ def recommendations():
             }
         ]
     }
+========
+from app.main import app
+>>>>>>>> 9324f52982ad4809b52bb67fe949438e52e7079c:backend/main.py
