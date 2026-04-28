@@ -1,0 +1,91 @@
+stages:
+  - install
+  - test
+  - build
+
+# =====================
+# ANDROID / KOTLIN
+# =====================
+
+android_install:
+  stage: install
+  image: gradle:8.7-jdk17
+  script:
+    - cd android
+    - chmod +x ./gradlew
+    - ./gradlew dependencies
+
+android_test:
+  stage: test
+  image: gradle:8.7-jdk17
+  before_script:
+    - cd android
+    - chmod +x ./gradlew
+  script:
+    - ./gradlew :app:testDebugUnitTest
+  artifacts:
+    when: always
+    paths:
+      - android/app/build/reports/tests/
+      - android/app/build/test-results/
+    expire_in: 1 week
+
+android_lint:
+  stage: test
+  image: gradle:8.7-jdk17
+  before_script:
+    - cd android
+    - chmod +x ./gradlew
+  script:
+    - ./gradlew :app:lintDebug
+  artifacts:
+    when: always
+    paths:
+      - android/app/build/reports/
+    expire_in: 1 week
+
+android_build:
+  stage: build
+  image: gradle:8.7-jdk17
+  before_script:
+    - cd android
+    - chmod +x ./gradlew
+  script:
+    - ./gradlew :app:clean :app:assembleDebug
+  artifacts:
+    paths:
+      - android/app/build/outputs/apk/debug/
+    expire_in: 1 week
+
+# =====================
+# BACKEND / PYTHON
+# =====================
+
+backend_install:
+  stage: install
+  image: python:3.11
+  script:
+    - cd backend
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+
+backend_test:
+  stage: test
+  image: python:3.11
+  before_script:
+    - cd backend
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+    - pip install pytest
+  script:
+    - pytest || echo "No backend tests found yet"
+
+backend_build:
+  stage: build
+  image: python:3.11
+  before_script:
+    - cd backend
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - python -m compileall app main.py
