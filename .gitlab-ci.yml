@@ -10,6 +10,8 @@ stages:
 android_install:
   stage: install
   image: gradle:8.7-jdk17
+  tags:
+    - local-docker
   script:
     - cd android
     - chmod +x ./gradlew
@@ -18,6 +20,8 @@ android_install:
 android_test:
   stage: test
   image: gradle:8.7-jdk17
+  tags:
+    - local-docker
   before_script:
     - cd android
     - chmod +x ./gradlew
@@ -33,6 +37,8 @@ android_test:
 android_lint:
   stage: test
   image: gradle:8.7-jdk17
+  tags:
+    - local-docker
   before_script:
     - cd android
     - chmod +x ./gradlew
@@ -47,6 +53,8 @@ android_lint:
 android_build:
   stage: build
   image: gradle:8.7-jdk17
+  tags:
+    - local-docker
   before_script:
     - cd android
     - chmod +x ./gradlew
@@ -63,7 +71,9 @@ android_build:
 
 backend_install:
   stage: install
-  image: python:3.11
+  image: python:3.13
+  tags:
+    - local-docker
   script:
     - cd backend
     - python -m pip install --upgrade pip
@@ -71,18 +81,22 @@ backend_install:
 
 backend_test:
   stage: test
-  image: python:3.11
+  image: python:3.13
+  tags:
+    - local-docker
   before_script:
     - cd backend
     - python -m pip install --upgrade pip
     - pip install -r requirements.txt
     - pip install pytest
   script:
-    - pytest || echo "No backend tests found yet"
+    - pytest
 
 backend_build:
   stage: build
-  image: python:3.11
+  image: python:3.13
+  tags:
+    - local-docker
   before_script:
     - cd backend
     - python -m pip install --upgrade pip
