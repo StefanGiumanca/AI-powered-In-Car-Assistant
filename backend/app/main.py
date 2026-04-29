@@ -1,19 +1,39 @@
+<<<<<<<< f8193069009012b070d8edb398d820b8b8207c6d:backend/app/main.py
 from fastapi import FastAPI
 
-from app.api.v1.routes import recommendations, trips, vehicle_state
-from app.core.config import settings
+app = FastAPI()
 
 
-app = FastAPI(title=settings.app_name)
+@app.get("/")
+def root():
+    return {
+        "message": "DavaRoutes backend is running"
+    }
 
-app.include_router(trips.router, prefix="/api/v1/trips", tags=["trips"])
-app.include_router(
-    vehicle_state.router,
-    prefix="/api/v1/vehicle-state",
-    tags=["vehicle-state"],
-)
-app.include_router(
-    recommendations.router,
-    prefix="/api/v1/recommendations",
-    tags=["recommendations"],
-)
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
+
+
+@app.get("/recommendations")
+def recommendations():
+    return {
+        "items": [
+            {
+                "name": "OMV Charging Station",
+                "type": "charging",
+                "distance_km": 42
+            },
+            {
+                "name": "McDonald's Drive-Thru",
+                "type": "food",
+                "distance_km": 45
+            }
+        ]
+    }
+========
+from app.main import app
+>>>>>>>> 9324f52982ad4809b52bb67fe949438e52e7079c:backend/main.py

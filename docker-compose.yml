@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: davaroutes_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: davaroutes_user
+      POSTGRES_PASSWORD: davaroutes_password
+      POSTGRES_DB: davaroutes_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - davaroutes_postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U davaroutes_user -d davaroutes_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: davaroutes_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+volumes:
+  davaroutes_postgres_data:
