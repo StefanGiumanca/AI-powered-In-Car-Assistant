@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">DavaRoutes</string>
+    <string name="title_activity_create_trip">CreateTripActivity</string>
 </resources>
