@@ -14,6 +14,7 @@ android_install:
     - local-docker
   script:
     - cd android
+    - sed -i 's/\r$//' ./gradlew
     - chmod +x ./gradlew
     - ./gradlew dependencies
 
@@ -24,6 +25,7 @@ android_test:
     - local-docker
   before_script:
     - cd android
+    - sed -i 's/\r$//' ./gradlew
     - chmod +x ./gradlew
   script:
     - ./gradlew :app:testDebugUnitTest
@@ -41,6 +43,7 @@ android_lint:
     - local-docker
   before_script:
     - cd android
+    - sed -i 's/\r$//' ./gradlew
     - chmod +x ./gradlew
   script:
     - ./gradlew :app:lintDebug
@@ -57,6 +60,7 @@ android_build:
     - local-docker
   before_script:
     - cd android
+    - sed -i 's/\r$//' ./gradlew
     - chmod +x ./gradlew
   script:
     - ./gradlew :app:clean :app:assembleDebug
