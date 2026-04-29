@@ -2,7 +2,15 @@ from fastapi import FastAPI
 # Adaugat de mine
 from pydantic import BaseModel
 
+from app.api.v1.routes.recommendations import router as recommendations_router
+from app.api.v1.routes.trips import router as trips_router
+from app.api.v1.routes.users import router as users_router
+
 app = FastAPI()
+
+app.include_router(recommendations_router)
+app.include_router(trips_router)
+app.include_router(users_router)
 
 # Adaugat de mine
 class Trip(BaseModel):
