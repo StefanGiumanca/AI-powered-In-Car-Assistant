@@ -25,14 +25,20 @@ class CreateTripActivity : ComponentActivity() {
 
         setContent {
             DavaRoutesTheme {
-                CreateTripScreen()
+                val userIdFromLogin = intent.getStringExtra("user_id") ?: ""
+
+                CreateTripScreen(
+                    initialUserId = userIdFromLogin
+                )
             }
         }
     }
 
     @Composable
-    fun CreateTripScreen() {
-        var userId by remember { mutableStateOf("") }
+    fun CreateTripScreen(
+        initialUserId: String
+    ) {
+        var userId by remember { mutableStateOf(initialUserId) }
         var vehicleId by remember { mutableStateOf("") }
         var driverProfileId by remember { mutableStateOf("") }
 

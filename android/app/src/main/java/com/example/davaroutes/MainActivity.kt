@@ -18,6 +18,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val accessToken = intent.getStringExtra("access_token") ?: ""
+        val tokenType = intent.getStringExtra("token_type") ?: "bearer"
+        val userId = intent.getStringExtra("user_id") ?: ""
+        val email = intent.getStringExtra("email") ?: ""
+        val fullName = intent.getStringExtra("full_name") ?: ""
+
         setContent {
             DavaRoutesTheme {
                 Box(
@@ -26,9 +32,18 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Button(
                         onClick = {
-                            startActivity(
-                                Intent(this@MainActivity, CreateTripActivity::class.java)
+                            val createTripIntent = Intent(
+                                this@MainActivity,
+                                CreateTripActivity::class.java
                             )
+
+                            createTripIntent.putExtra("access_token", accessToken)
+                            createTripIntent.putExtra("token_type", tokenType)
+                            createTripIntent.putExtra("user_id", userId)
+                            createTripIntent.putExtra("email", email)
+                            createTripIntent.putExtra("full_name", fullName)
+
+                            startActivity(createTripIntent)
                         }
                     ) {
                         Text("Create trip")
