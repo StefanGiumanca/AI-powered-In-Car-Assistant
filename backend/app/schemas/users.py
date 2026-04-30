@@ -14,7 +14,14 @@ class UserDTO(APIModel):
 
 class DriverProfileDTO(APIModel):
     id: str = Field(..., min_length=1, max_length=100)
-    profile_type: Literal["balanced", "eco", "fast", "comfort"]
+    profile_type: Literal[
+    "fastest",
+    "cheapest",
+    "family",
+    "scenic",
+    "balanced",
+    "business",
+]
     avoid_tolls: bool
     max_detour_minutes: int = Field(..., ge=0)
 

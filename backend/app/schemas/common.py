@@ -5,7 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # Shared DTO primitives and reusable constrained types for the API contract.
 class APIModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        from_attributes=True,
+    )
 
 
 class CurrentLocationDTO(APIModel):
