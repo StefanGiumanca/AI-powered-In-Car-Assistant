@@ -19,10 +19,14 @@ from .recommendations import (
 )
 from .trips import (
     RouteDTO,
+    TripDTO,
+    TripDetailResponse,
+    TripRecommendationDTO,
     TripStartRequest,
     TripStartResponse,
     TripUpdateRequest,
     TripUpdateResponse,
+    TripUpdateVehicleStateDTO,
 )
 from .users import DriverProfileDTO, UserDTO
 from .vehicles import (
@@ -55,10 +59,14 @@ __all__ = [
     "RecommendationEventResponse",
     "RegisterRequest",
     "RouteDTO",
+    "TripDTO",
+    "TripDetailResponse",
+    "TripRecommendationDTO",
     "TripStartRequest",
     "TripStartResponse",
     "TripUpdateRequest",
     "TripUpdateResponse",
+    "TripUpdateVehicleStateDTO",
     "UserDTO",
     "VehicleCreateRequest",
     "VehicleDTO",
