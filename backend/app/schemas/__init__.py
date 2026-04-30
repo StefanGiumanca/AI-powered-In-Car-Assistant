@@ -1,3 +1,4 @@
+from .auth import AuthUserResponse, LoginRequest, LoginResponse, RegisterRequest
 from .common import (
     APIModel,
     CurrentLocationDTO,
@@ -26,12 +27,15 @@ from .vehicles import VehicleDTO, VehicleStateDTO
 
 __all__ = [
     "APIModel",
+    "AuthUserResponse",
     "BootstrapResponse",
     "CurrentLocationDTO",
     "DriverProfileDTO",
     "HealthResponse",
     "IdentifiedLocationDTO",
     "LabeledLocationDTO",
+    "LoginRequest",
+    "LoginResponse",
     "NamedLocationDTO",
     "NextActionRequest",
     "NextActionResponse",
@@ -39,6 +43,7 @@ __all__ = [
     "RecommendationDTO",
     "RecommendationEventRequest",
     "RecommendationEventResponse",
+    "RegisterRequest",
     "RouteDTO",
     "TripStartRequest",
     "TripStartResponse",
