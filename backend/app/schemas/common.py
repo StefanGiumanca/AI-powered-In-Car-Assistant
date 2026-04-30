@@ -34,5 +34,5 @@ class IdentifiedLocationDTO(APIModel):
 
 TripStatus = Literal["active", "completed", "cancelled"]
 RecommendationPriority = Literal["low", "medium", "high"]
-RequestedMode = Literal["balanced", "eco", "fast", "comfort"]
-TirePressureStatus = Literal["ok", "low", "critical", "unknown"]
+RequestedMode = Literal["fastest", "cheapest", "family", "balanced"]
+TirePressureStatus = Literal["ok", "low", "critical", "unknown", "high"]
