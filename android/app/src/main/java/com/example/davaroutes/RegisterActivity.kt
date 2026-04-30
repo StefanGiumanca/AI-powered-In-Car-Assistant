@@ -1,35 +1,30 @@
 package com.example.davaroutes
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.data.RegisterRequest
 import com.example.davaroutes.network.RetrofitClient
-import com.example.davaroutes.ui.theme.DavaRoutesTheme
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import com.example.davaroutes.ui.components.ModernInput
-import com.example.davaroutes.ui.components.SectionTitle
-import com.example.davaroutes.ui.components.modernTextFieldColors
 import com.example.davaroutes.ui.theme.*
+import kotlinx.coroutines.launch
 
 class RegisterActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -46,13 +41,6 @@ class RegisterActivity : ComponentActivity() {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
         var fullName by remember { mutableStateOf("") }
-
-        var profileName by remember { mutableStateOf("") }
-        var profileType by remember { mutableStateOf("balanced") }
-
-        var vehicleModel by remember { mutableStateOf("") }
-        var vehicleYear by remember { mutableStateOf("") }
-        var powertrain by remember { mutableStateOf("ICE") }
 
         Box(
             modifier = Modifier
@@ -84,24 +72,28 @@ class RegisterActivity : ComponentActivity() {
                         )
 
                         Text(
-                            text = "Set up your driving profile",
+                            text = "Register with email, password and name",
                             color = MutedText
                         )
 
-                        ModernInput(email, { email = it }, "Email")
-                        ModernInput(password, { password = it }, "Password", true)
-                        ModernInput(fullName, { fullName = it }, "Full name")
+                        ModernInput(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = "Email"
+                        )
 
-                        SectionTitle("Driver profile")
+                        ModernInput(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = "Password",
+                            isPassword = true
+                        )
 
-                        ModernInput(profileName, { profileName = it }, "Profile name")
-                        ModernInput(profileType, { profileType = it }, "Profile type")
-
-                        SectionTitle("Vehicle")
-
-                        ModernInput(vehicleModel, { vehicleModel = it }, "Vehicle model")
-                        ModernInput(vehicleYear, { vehicleYear = it }, "Vehicle year")
-                        ModernInput(powertrain, { powertrain = it }, "Powertrain")
+                        ModernInput(
+                            value = fullName,
+                            onValueChange = { fullName = it },
+                            label = "Full name"
+                        )
 
                         Button(
                             modifier = Modifier
@@ -121,46 +113,47 @@ class RegisterActivity : ComponentActivity() {
                                         val response = RetrofitClient.api.register(request)
 
                                         if (response.isSuccessful) {
-                                            response.body()?.let { body ->
-                                                val intent = Intent(
-                                                    this@RegisterActivity,
-                                                    MainActivity::class.java
-                                                )
-
-                                                intent.putExtra("access_token", body.access_token)
-                                                intent.putExtra("token_type", body.token_type)
-                                                intent.putExtra("user_id", body.user.id)
-                                                intent.putExtra("email", body.user.email)
-                                                intent.putExtra("full_name", body.user.full_name)
-
-                                                startActivity(intent)
-                                                finish()
-                                            }
-                                        } else {
                                             Toast.makeText(
                                                 this@RegisterActivity,
-                                                "Eroare register: ${response.code()}",
+                                                "Cont creat cu succes. Te poți loga.",
                                                 Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            finish()
+                                        } else {
+                                            val errorBody = response.errorBody()?.string()
+
+                                            Toast.makeText(
+                                                this@RegisterActivity,
+                                                "Eroare register ${response.code()}: $errorBody",
+                                                Toast.LENGTH_LONG
                                             ).show()
                                         }
                                     } catch (e: Exception) {
                                         Toast.makeText(
                                             this@RegisterActivity,
                                             "Eroare: ${e.message}",
-                                            Toast.LENGTH_SHORT
+                                            Toast.LENGTH_LONG
                                         ).show()
                                     }
                                 }
                             }
                         ) {
-                            Text("Register", fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(
+                                text = "Register",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
 
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { finish() }
                         ) {
-                            Text("Already have an account? Login", color = Orange)
+                            Text(
+                                text = "Already have an account? Login",
+                                color = Orange
+                            )
                         }
                     }
                 }
