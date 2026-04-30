@@ -20,14 +20,7 @@ data class AuthUser(
 data class RegisterRequest(
     val email: String,
     val password: String,
-    val full_name: String,
-
-    val profile_name: String?,
-    val profile_type: String?,
-
-    val vehicle_model: String?,
-    val vehicle_year: Int?,
-    val powertrain: String?
+    val full_name: String
 )
 
 data class RegisterResponse(

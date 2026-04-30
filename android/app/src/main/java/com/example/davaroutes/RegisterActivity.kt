@@ -115,12 +115,7 @@ class RegisterActivity : ComponentActivity() {
                                         val request = RegisterRequest(
                                             email = email,
                                             password = password,
-                                            full_name = fullName,
-                                            profile_name = profileName.ifBlank { null },
-                                            profile_type = profileType.ifBlank { null },
-                                            vehicle_model = vehicleModel.ifBlank { null },
-                                            vehicle_year = vehicleYear.toIntOrNull(),
-                                            powertrain = powertrain.ifBlank { null }
+                                            full_name = fullName
                                         )
 
                                         val response = RetrofitClient.api.register(request)
