@@ -9,9 +9,14 @@ from .common import APIModel, TirePressureStatus
 class VehicleDTO(APIModel):
     id: str = Field(..., min_length=1, max_length=100)
     model: str = Field(..., min_length=1, max_length=120)
-    powertrain: Literal["ICE", "EV", "HEV", "PHEV"]
-    fuel_tank_liters: float = Field(..., gt=0)
-    consumption_l_per_100km: float = Field(..., gt=0)
+    powertrain: Literal["ICE", "EV", "HYBRID"]
+
+    fuel_tank_liters: float | None = Field(default=None, gt=0)
+    consumption_l_per_100km: float | None = Field(default=None, gt=0)
+
+    battery_capacity_kwh: float | None = Field(default=None, gt=0)
+    consumption_kwh_per_100km: float | None = Field(default=None, gt=0)
+    connector_type: str | None = None
 
 
 class VehicleStateDTO(APIModel):
