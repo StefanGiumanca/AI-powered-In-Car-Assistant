@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.routes.auth import router as auth_router
 from app.api.v1.routes.driver_profiles import router as driver_profiles_router
 from app.api.v1.routes.recommendations import router as recommendations_router
+from app.api.v1.routes.routes import router as routes_router
 from app.api.v1.routes.trips import router as trips_router
 from app.api.v1.routes.users import router as users_router
 from app.api.v1.routes.vehicle_state import router as vehicle_state_router
@@ -32,6 +33,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(driver_profiles_router)
 app.include_router(trips_router)
+app.include_router(routes_router)
 app.include_router(recommendations_router)
 app.include_router(vehicle_state_router)
 app.include_router(vehicles_router)

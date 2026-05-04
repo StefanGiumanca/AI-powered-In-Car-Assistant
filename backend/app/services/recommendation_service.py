@@ -198,13 +198,13 @@ def build_recommendation(recommendation_id=None, vehicle_state=None) -> Recommen
             confidence=0.85,
             detour_minutes=8,
             location=NamedLocationDTO(
-                id="mock_charge_location",
+                id="charge_location",
                 name="OMV Charging Station",
                 lat=44.4268,
                 lng=26.1025,
             ),
             offer=OfferDTO(
-                id="mock_offer_charge",
+                id="offer_charge",
                 title="Earn 80 loyalty points",
                 loyalty_points=80,
             ),
@@ -220,13 +220,13 @@ def build_recommendation(recommendation_id=None, vehicle_state=None) -> Recommen
             confidence=0.85,
             detour_minutes=6,
             location=NamedLocationDTO(
-                id="mock_fuel_location",
+                id="fuel_location",
                 name="OMV Fuel Station",
                 lat=44.4268,
                 lng=26.1025,
             ),
             offer=OfferDTO(
-                id="mock_offer_fuel",
+                id="offer_fuel",
                 title="Earn 50 loyalty points",
                 loyalty_points=50,
             ),
@@ -242,13 +242,13 @@ def build_recommendation(recommendation_id=None, vehicle_state=None) -> Recommen
             confidence=0.75,
             detour_minutes=10,
             location=NamedLocationDTO(
-                id="mock_service_location",
+                id="service_location",
                 name="Authorized Service Center",
                 lat=44.4268,
                 lng=26.1025,
             ),
             offer=OfferDTO(
-                id="mock_offer_service",
+                id="offer_service",
                 title="Service inspection discount",
                 loyalty_points=100,
             ),
@@ -263,13 +263,13 @@ def build_recommendation(recommendation_id=None, vehicle_state=None) -> Recommen
         confidence=0.65,
         detour_minutes=0,
         location=NamedLocationDTO(
-            id="mock_continue",
+            id="continue_route",
             name="Current route",
             lat=44.4268,
             lng=26.1025,
         ),
         offer=OfferDTO(
-            id="mock_offer_none",
+            id="offer_none",
             title="No active offer",
             loyalty_points=0,
         ),
