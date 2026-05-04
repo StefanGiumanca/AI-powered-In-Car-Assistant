@@ -83,6 +83,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
+    //Places api
+    implementation("com.google.android.libraries.places:places:4.3.1")
+
     // Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.33.2-alpha")
 
