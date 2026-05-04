@@ -26,9 +26,13 @@ class CreateTripActivity : ComponentActivity() {
         setContent {
             DavaRoutesTheme {
                 val userIdFromLogin = intent.getStringExtra("user_id") ?: ""
+                val originLatFromMap = intent.getDoubleExtra("origin_lat", 0.0)
+                val originLngFromMap = intent.getDoubleExtra("origin_lng", 0.0)
 
                 CreateTripScreen(
-                    initialUserId = userIdFromLogin
+                    initialUserId = userIdFromLogin,
+                    initialOriginLat = if (originLatFromMap != 0.0) originLatFromMap.toString() else "",
+                    initialOriginLng = if (originLngFromMap != 0.0) originLngFromMap.toString() else ""
                 )
             }
         }
@@ -36,15 +40,17 @@ class CreateTripActivity : ComponentActivity() {
 
     @Composable
     fun CreateTripScreen(
-        initialUserId: String
+        initialUserId: String,
+        initialOriginLat: String,
+        initialOriginLng: String
     ) {
         var userId by remember { mutableStateOf(initialUserId) }
         var vehicleId by remember { mutableStateOf("") }
         var driverProfileId by remember { mutableStateOf("") }
 
         var originLabel by remember { mutableStateOf("") }
-        var originLat by remember { mutableStateOf("") }
-        var originLng by remember { mutableStateOf("") }
+        var originLat by remember { mutableStateOf(initialOriginLat) }
+        var originLng by remember { mutableStateOf(initialOriginLng) }
 
         var destinationLabel by remember { mutableStateOf("") }
         var destinationLat by remember { mutableStateOf("") }
