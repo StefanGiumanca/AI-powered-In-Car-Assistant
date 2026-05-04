@@ -158,7 +158,7 @@ class LoginActivity : ComponentActivity() {
         email: String,
         fullName: String
     ) {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, UserDashboard::class.java)
 
         intent.putExtra("access_token", accessToken)
         intent.putExtra("token_type", tokenType)
