@@ -82,6 +82,10 @@ class MainActivity : ComponentActivity() {
         var destinationName by remember { mutableStateOf("") }
         var permissionGranted by remember { mutableStateOf(false) }
 
+        var showRouteForm by remember { mutableStateOf(false) }
+        var currentRange by remember { mutableStateOf("") }
+        var routePreferences by remember { mutableStateOf("") }
+
         val cameraPositionState = rememberCameraPositionState()
 
         val placesLauncher = rememberLauncherForActivityResult(
@@ -177,7 +181,7 @@ class MainActivity : ComponentActivity() {
                 Text(destinationName.ifBlank { "Caută destinația" })
             }
 
-            destinationLocation?.let { destination ->
+            destinationLocation?.let {
                 Card(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -195,6 +199,60 @@ class MainActivity : ComponentActivity() {
                         Button(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = {
+                                showRouteForm = true
+                            }
+                        ) {
+                            Text("Go there")
+                        }
+                    }
+                }
+            }
+
+            if (showRouteForm && destinationLocation != null) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showRouteForm = false
+                    },
+                    title = {
+                        Text("Detalii traseu")
+                    },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = currentRange,
+                                onValueChange = { currentRange = it },
+                                label = { Text("Range actual") },
+                                placeholder = { Text("Ex: 120 km") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = routePreferences,
+                                onValueChange = { routePreferences = it },
+                                label = { Text("Preferințe pe traseu") },
+                                placeholder = {
+                                    Text("Ex: benzinării, restaurante, stații de încărcare")
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val destination = destinationLocation!!
+
+                                if (currentRange.isBlank()) {
+                                    Toast.makeText(
+                                        activity,
+                                        "Introdu range-ul actual",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
+
                                 val createTripIntent = Intent(
                                     activity,
                                     CreateTripActivity::class.java
@@ -206,22 +264,35 @@ class MainActivity : ComponentActivity() {
                                 createTripIntent.putExtra("email", email)
                                 createTripIntent.putExtra("full_name", fullName)
 
-                                userLocation?.let {
-                                    createTripIntent.putExtra("origin_lat", it.latitude)
-                                    createTripIntent.putExtra("origin_lng", it.longitude)
+                                userLocation?.let { origin ->
+                                    createTripIntent.putExtra("origin_lat", origin.latitude)
+                                    createTripIntent.putExtra("origin_lng", origin.longitude)
                                 }
 
                                 createTripIntent.putExtra("destination_lat", destination.latitude)
                                 createTripIntent.putExtra("destination_lng", destination.longitude)
                                 createTripIntent.putExtra("destination_name", destinationName)
 
+                                createTripIntent.putExtra("current_range", currentRange)
+                                createTripIntent.putExtra("route_preferences", routePreferences)
+
+                                showRouteForm = false
                                 startActivity(createTripIntent)
                             }
                         ) {
-                            Text("Go here")
+                            Text("Caută ruta")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showRouteForm = false
+                            }
+                        ) {
+                            Text("Anulează")
                         }
                     }
-                }
+                )
             }
 
             FloatingActionButton(
@@ -281,31 +352,33 @@ class MainActivity : ComponentActivity() {
         fusedLocationClient.getCurrentLocation(
             Priority.PRIORITY_HIGH_ACCURACY,
             null
-        ).addOnSuccessListener { location: Location? ->
-            if (location != null) {
-                val latLng = LatLng(location.latitude, location.longitude)
+        )
+            .addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    val latLng = LatLng(location.latitude, location.longitude)
 
-                lifecycleScope.launch {
-                    cameraPositionState.move(
-                        CameraUpdateFactory.newLatLngZoom(latLng, 16f)
-                    )
-                    onLocationReceived(latLng)
+                    lifecycleScope.launch {
+                        cameraPositionState.move(
+                            CameraUpdateFactory.newLatLngZoom(latLng, 16f)
+                        )
+                        onLocationReceived(latLng)
+                    }
+                } else {
+                    Toast.makeText(
+                        activity,
+                        "Nu s-a putut obține locația. Verifică dacă GPS-ul este pornit.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onLocationReceived(null)
                 }
-            } else {
+            }
+            .addOnFailureListener { e ->
                 Toast.makeText(
                     activity,
-                    "Nu s-a putut obține locația. Verifică dacă GPS-ul este pornit.",
+                    "Eroare la obținerea locației: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
                 onLocationReceived(null)
             }
-        }.addOnFailureListener { e ->
-            Toast.makeText(
-                activity,
-                "Eroare la obținerea locației: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
-            onLocationReceived(null)
-        }
     }
 }
