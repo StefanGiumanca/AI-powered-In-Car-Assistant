@@ -21,6 +21,11 @@
             android:exported="false"
             android:label="@string/title_activity_user_dashboard"
             android:theme="@style/Theme.DavaRoutes" />
+        <activity
+            android:name=".AddVehicleActivity"
+            android:exported="false"
+            android:label="Add Car"
+            android:theme="@style/Theme.DavaRoutes" />
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"

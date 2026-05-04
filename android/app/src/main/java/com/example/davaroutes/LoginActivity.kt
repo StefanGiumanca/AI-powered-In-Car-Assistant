@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.data.LoginRequest
+import com.example.davaroutes.data.vehiclesToJson
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
 import kotlinx.coroutines.launch
@@ -108,12 +109,17 @@ class LoginActivity : ComponentActivity() {
 
                                     if (response.isSuccessful) {
                                         response.body()?.let { body ->
+                                            val authHeader = "Bearer ${body.access_token}"
+                                            val bootstrapResponse = RetrofitClient.api.bootstrap(authHeader)
+                                            val bootstrap = bootstrapResponse.body()
+
                                             openMainActivity(
                                                 accessToken = body.access_token,
                                                 tokenType = body.token_type,
-                                                userId = body.user.id,
-                                                email = body.user.email,
-                                                fullName = body.user.full_name
+                                                userId = bootstrap?.user?.id ?: body.user.id,
+                                                email = bootstrap?.user?.email ?: body.user.email,
+                                                fullName = bootstrap?.user?.full_name ?: body.user.full_name,
+                                                vehiclesJson = vehiclesToJson(bootstrap?.vehicles ?: emptyList())
                                             )
                                         }
                                     } else {
@@ -156,7 +162,8 @@ class LoginActivity : ComponentActivity() {
         tokenType: String,
         userId: String,
         email: String,
-        fullName: String
+        fullName: String,
+        vehiclesJson: String
     ) {
         val intent = Intent(this, MainActivity::class.java)
 
@@ -165,6 +172,7 @@ class LoginActivity : ComponentActivity() {
         intent.putExtra("user_id", userId)
         intent.putExtra("email", email)
         intent.putExtra("full_name", fullName)
+        intent.putExtra("vehicles_json", vehiclesJson)
 
         startActivity(intent)
         finish()
