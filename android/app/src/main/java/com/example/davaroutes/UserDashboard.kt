@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,7 +113,7 @@ class UserDashboard : ComponentActivity() {
                 ) {
                     ActionCard(
                         title = "Driver Profile",
-                        icon = "👤",
+                        icon = R.drawable.ic_id_card,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
@@ -120,7 +121,7 @@ class UserDashboard : ComponentActivity() {
                     )
                     ActionCard(
                         title = "Vehicle Profile",
-                        icon = "🚗",
+                        icon = R.drawable.ic_car,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
@@ -136,20 +137,20 @@ class UserDashboard : ComponentActivity() {
                 ) {
                     ActionCard(
                         title = "Recommendations",
-                        icon = "⚡",
+                        icon = R.drawable.ic_lightning,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
                         }
                     )
-                    ActionCard(
-                        title = "Partner Offers",
-                        icon = "🎁",
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                     ActionCard(
+                         title = "Last trips",
+                         icon = R.drawable.ic_clock,
+                         modifier = Modifier.weight(1f),
+                         onClick = {
+                             Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
+                         }
+                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -384,7 +385,7 @@ class UserDashboard : ComponentActivity() {
     @Composable
     fun ActionCard(
         title: String,
-        icon: String,
+        icon: Any,
         modifier: Modifier = Modifier,
         onClick: () -> Unit
     ) {
@@ -403,11 +404,25 @@ class UserDashboard : ComponentActivity() {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = icon,
-                    fontSize = 32.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                when (icon) {
+                    is Int -> {
+                        Icon(
+                            painter = painterResource(id = icon),
+                            contentDescription = title,
+                            tint = Orange,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .padding(bottom = 8.dp)
+                        )
+                    }
+                    is String -> {
+                        Text(
+                            text = icon,
+                            fontSize = 32.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelSmall,
