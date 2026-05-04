@@ -5,6 +5,7 @@ from app.api.v1.routes.auth import router as auth_router
 from app.api.v1.routes.recommendations import router as recommendations_router
 from app.api.v1.routes.trips import router as trips_router
 from app.api.v1.routes.users import router as users_router
+from app.api.v1.routes.places import router as places_router
 
 app = FastAPI(
     title="DavaRoutes API",
@@ -28,6 +29,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(trips_router)
 app.include_router(recommendations_router)
+app.include_router(places_router)
 
 
 @app.get("/")
