@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
                     destinationName = place.name ?: place.address ?: "Destinație selectată"
 
                     lifecycleScope.launch {
-                        cameraPositionState.animate(
+                        cameraPositionState.move(
                             CameraUpdateFactory.newLatLngZoom(latLng, 15f)
                         )
                     }
@@ -226,6 +226,26 @@ class MainActivity : ComponentActivity() {
 
             FloatingActionButton(
                 modifier = Modifier
+                    .padding(top = 112.dp, end = 16.dp)
+                    .align(Alignment.TopEnd),
+                containerColor = Orange,
+                onClick = {
+                    val intent = Intent(activity, UserDashboard::class.java)
+
+                    intent.putExtra("access_token", accessToken)
+                    intent.putExtra("token_type", tokenType)
+                    intent.putExtra("user_id", userId)
+                    intent.putExtra("email", email)
+                    intent.putExtra("full_name", fullName)
+
+                    startActivity(intent)
+                }
+            ) {
+                Text("☰")
+            }
+
+            FloatingActionButton(
+                modifier = Modifier
                     .padding(16.dp)
                     .align(Alignment.BottomStart),
                 containerColor = Orange,
@@ -266,7 +286,7 @@ class MainActivity : ComponentActivity() {
                 val latLng = LatLng(location.latitude, location.longitude)
 
                 lifecycleScope.launch {
-                    cameraPositionState.animate(
+                    cameraPositionState.move(
                         CameraUpdateFactory.newLatLngZoom(latLng, 16f)
                     )
                     onLocationReceived(latLng)
