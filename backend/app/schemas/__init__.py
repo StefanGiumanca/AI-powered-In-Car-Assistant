@@ -17,11 +17,10 @@ from .recommendations import (
     RecommendationEventRequest,
     RecommendationEventResponse,
 )
+from .routes import RouteDTO, RoutePreviewRequest, RoutePreviewResponse
 from .trips import (
-    RouteDTO,
     TripDTO,
     TripDetailResponse,
-    TripRecommendationDTO,
     TripStartRequest,
     TripStartResponse,
     TripUpdateRequest,
@@ -59,9 +58,10 @@ __all__ = [
     "RecommendationEventResponse",
     "RegisterRequest",
     "RouteDTO",
+    "RoutePreviewRequest",
+    "RoutePreviewResponse",
     "TripDTO",
     "TripDetailResponse",
-    "TripRecommendationDTO",
     "TripStartRequest",
     "TripStartResponse",
     "TripUpdateRequest",

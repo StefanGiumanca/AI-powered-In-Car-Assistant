@@ -4,7 +4,6 @@ import unittest
 
 import pytest
 
-from app.services import mock_state
 from tests.asgi_client import request_app
 
 
@@ -40,9 +39,6 @@ TRIP_START_PAYLOAD = {
 
 
 class MvpEndpointTest(unittest.TestCase):
-    def setUp(self) -> None:
-        mock_state.reset_mock_state()
-
     def test_trip_start_valid_request_creates_trip_and_recommendation(self) -> None:
         status, body = asyncio.run(
             request_app("POST", "/trip/start", TRIP_START_PAYLOAD)
