@@ -28,3 +28,10 @@ data class RegisterResponse(
     val email: String,
     val full_name: String
 )
+
+data class BootstrapResponse(
+    val user: AuthUser,
+    val vehicles: List<VehicleResponse>,
+    val driver_profiles: List<Any>?,
+    val latest_vehicle_state: Any?
+)

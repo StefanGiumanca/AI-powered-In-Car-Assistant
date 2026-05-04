@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
 import com.example.davaroutes.ui.theme.Orange
+import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
         val userId = intent.getStringExtra("user_id") ?: ""
         val email = intent.getStringExtra("email") ?: ""
         val fullName = intent.getStringExtra("full_name") ?: ""
+        val vehiclesJson = intent.getStringExtra(EXTRA_VEHICLES_JSON) ?: "[]"
 
         setContent {
             DavaRoutesTheme {
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
                     userId = userId,
                     email = email,
                     fullName = fullName,
+                    vehiclesJson = vehiclesJson,
                     activity = this@MainActivity
                 )
             }
@@ -75,6 +78,7 @@ class MainActivity : ComponentActivity() {
         userId: String,
         email: String,
         fullName: String,
+        vehiclesJson: String,
         activity: MainActivity
     ) {
         var userLocation by remember { mutableStateOf<LatLng?>(null) }
@@ -308,6 +312,7 @@ class MainActivity : ComponentActivity() {
                     intent.putExtra("user_id", userId)
                     intent.putExtra("email", email)
                     intent.putExtra("full_name", fullName)
+                    intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesJson)
 
                     startActivity(intent)
                 }

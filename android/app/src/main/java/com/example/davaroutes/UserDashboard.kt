@@ -2,6 +2,9 @@ package com.example.davaroutes
 
 import android.content.Intent
 import android.os.Bundle
+import android.app.Activity.RESULT_OK
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,14 +15,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.davaroutes.data.EXTRA_CREATED_VEHICLE_JSON
+import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
+import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
+import com.example.davaroutes.data.PREF_MAIN_VEHICLE_ID
+import com.example.davaroutes.data.VEHICLE_PREFS
+import com.example.davaroutes.data.VehicleResponse
+import com.example.davaroutes.data.vehicleFromJson
+import com.example.davaroutes.data.vehiclesFromJson
+import com.example.davaroutes.data.vehiclesToJson
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
 import com.example.davaroutes.ui.theme.DarkNavy
 import com.example.davaroutes.ui.theme.NavyCard
@@ -37,6 +52,7 @@ class UserDashboard : ComponentActivity() {
         val userId = intent.getStringExtra("user_id") ?: ""
         val email = intent.getStringExtra("email") ?: ""
         val fullName = intent.getStringExtra("full_name") ?: ""
+        val vehiclesJson = intent.getStringExtra(EXTRA_VEHICLES_JSON) ?: "[]"
 
         setContent {
             DavaRoutesTheme {
@@ -46,6 +62,7 @@ class UserDashboard : ComponentActivity() {
                     userId = userId,
                     email = email,
                     fullName = fullName,
+                    vehiclesJson = vehiclesJson,
                     activity = this@UserDashboard
                 )
             }
@@ -59,8 +76,53 @@ class UserDashboard : ComponentActivity() {
         userId: String,
         email: String,
         fullName: String,
+        vehiclesJson: String,
         activity: UserDashboard
     ) {
+        val preferences = activity.getSharedPreferences(VEHICLE_PREFS, MODE_PRIVATE)
+        var vehicles by remember {
+            mutableStateOf(vehiclesFromJson(vehiclesJson))
+        }
+        var selectedVehicleId by remember {
+            mutableStateOf(preferences.getString(PREF_MAIN_VEHICLE_ID, null))
+        }
+        val selectedVehicle = vehicles.firstOrNull { it.id == selectedVehicleId }
+            ?: vehicles.firstOrNull()
+
+        val addVehicleLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val createdVehicle = vehicleFromJson(
+                    result.data?.getStringExtra(EXTRA_CREATED_VEHICLE_JSON)
+                )
+
+                if (createdVehicle != null) {
+                    vehicles = vehicles
+                        .filterNot { it.id == createdVehicle.id }
+                        .plus(createdVehicle)
+
+                    if (selectedVehicleId == null) {
+                        selectedVehicleId = createdVehicle.id
+                        preferences.edit().putString(PREF_MAIN_VEHICLE_ID, createdVehicle.id).apply()
+                    }
+                }
+            }
+        }
+
+        val vehicleProfileLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val selectedId = result.data?.getStringExtra(EXTRA_SELECTED_VEHICLE_ID)
+
+                if (!selectedId.isNullOrBlank()) {
+                    selectedVehicleId = selectedId
+                    preferences.edit().putString(PREF_MAIN_VEHICLE_ID, selectedId).apply()
+                }
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -79,7 +141,16 @@ class UserDashboard : ComponentActivity() {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Vehicle Status Card
-                VehicleStatusCard()
+                VehicleStatusCard(
+                    selectedVehicle = selectedVehicle,
+                    vehicleCount = vehicles.size,
+                    onAddCarClick = {
+                        val intent = Intent(activity, AddVehicleActivity::class.java)
+                        intent.putExtra("access_token", accessToken)
+                        intent.putExtra("token_type", tokenType)
+                        addVehicleLauncher.launch(intent)
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -90,6 +161,7 @@ class UserDashboard : ComponentActivity() {
                     userId = userId,
                     email = email,
                     fullName = fullName,
+                    vehiclesJson = vehiclesToJson(vehicles),
                     activity = activity
                 )
 
@@ -128,7 +200,11 @@ class UserDashboard : ComponentActivity() {
                         modifier = Modifier.weight(1f),
                         onClick = {
                             val intent = Intent(activity, VehicleProfileActivity::class.java)
-                            activity.startActivity(intent)
+                            intent.putExtra("access_token", accessToken)
+                            intent.putExtra("token_type", tokenType)
+                            intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesToJson(vehicles))
+                            intent.putExtra(EXTRA_SELECTED_VEHICLE_ID, selectedVehicleId)
+                            vehicleProfileLauncher.launch(intent)
                         }
                     )
                 }
@@ -201,7 +277,11 @@ class UserDashboard : ComponentActivity() {
     }
 
     @Composable
-    fun VehicleStatusCard() {
+    fun VehicleStatusCard(
+        selectedVehicle: VehicleResponse?,
+        vehicleCount: Int,
+        onAddCarClick: () -> Unit
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -229,7 +309,7 @@ class UserDashboard : ComponentActivity() {
                         color = SoftWhite
                     )
                     Text(
-                        text = "OK",
+                        text = if (selectedVehicle == null) "No car" else "Main car",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF4CAF50),
                         fontWeight = FontWeight.SemiBold
@@ -247,104 +327,30 @@ class UserDashboard : ComponentActivity() {
                         color = MutedText
                     )
                     Text(
-                        text = "Tesla Model 3",
+                        text = selectedVehicle?.model ?: "No vehicle added yet",
                         style = MaterialTheme.typography.bodyLarge,
                         color = SoftWhite,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                // Battery and Range Row
-                Row(
+                Text(
+                    text = selectedVehicle?.dashboardSummary()
+                        ?: "Add a car to unlock range estimates, service reminders, and personalized charging recommendations.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MutedText
+                )
+
+                Button(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Orange,
+                        contentColor = Color.White
+                    ),
+                    onClick = onAddCarClick
                 ) {
-                    // Battery Status
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(
-                                Color(0xFF0B2133),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Battery",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MutedText
-                        )
-                        Text(
-                            text = "72%",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = Orange,
-                            fontWeight = FontWeight.Bold
-                        )
-                        LinearProgressIndicator(
-                            progress = { 0.72f },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp),
-                            color = Orange,
-                            trackColor = Color(0xFF35566B),
-                            strokeCap = StrokeCap.Round
-                        )
-                    }
-
-                    // Estimated Range
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(
-                                Color(0xFF0B2133),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Range",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MutedText
-                        )
-                        Text(
-                            text = "310 km",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = SoftWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Estimated",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MutedText
-                        )
-                    }
-                }
-
-                // Service Status
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Color(0xFF0B2133),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Service Status",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MutedText
-                    )
-                    Text(
-                        text = "Good",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF4CAF50),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(if (vehicleCount == 0) "Add Car" else "Add Another Car", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -357,6 +363,7 @@ class UserDashboard : ComponentActivity() {
         userId: String,
         email: String,
         fullName: String,
+        vehiclesJson: String,
         activity: UserDashboard
     ) {
         Button(
@@ -376,6 +383,7 @@ class UserDashboard : ComponentActivity() {
                 intent.putExtra("user_id", userId)
                 intent.putExtra("email", email)
                 intent.putExtra("full_name", fullName)
+                intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesJson)
                 activity.startActivity(intent)
             }
         ) {
@@ -440,5 +448,30 @@ class UserDashboard : ComponentActivity() {
                 )
             }
         }
+    }
+}
+
+private fun VehicleResponse.dashboardSummary(): String {
+    val yearText = year?.toString()
+    val connectorText = connector_type?.takeIf { it.isNotBlank() }
+    val capacityText = battery_capacity_kwh?.let { "${it.cleanNumber()} kWh" }
+        ?: fuel_tank_liters?.let { "${it.cleanNumber()} L tank" }
+    val serviceText = service_interval_km?.let { "service every $it km" }
+        ?: service_interval_months?.let { "service every $it months" }
+
+    return listOfNotNull(
+        yearText,
+        powertrain,
+        connectorText,
+        capacityText,
+        serviceText
+    ).joinToString(" - ")
+}
+
+private fun Double.cleanNumber(): String {
+    return if (this % 1.0 == 0.0) {
+        toInt().toString()
+    } else {
+        toString()
     }
 }
