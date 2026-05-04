@@ -42,6 +42,26 @@
             android:label="@string/title_activity_create_trip"
             android:theme="@style/Theme.DavaRoutes" />
         <activity
+            android:name=".DriverProfileActivity"
+            android:exported="false"
+            android:label="Driver Profile"
+            android:theme="@style/Theme.DavaRoutes" />
+        <activity
+            android:name=".VehicleProfileActivity"
+            android:exported="false"
+            android:label="Vehicle Profile"
+            android:theme="@style/Theme.DavaRoutes" />
+        <activity
+            android:name=".RecommendationsActivity"
+            android:exported="false"
+            android:label="Recommendations"
+            android:theme="@style/Theme.DavaRoutes" />
+        <activity
+            android:name=".LastTripsActivity"
+            android:exported="false"
+            android:label="Trip History"
+            android:theme="@style/Theme.DavaRoutes" />
+        <activity
             android:name=".LoginActivity"
             android:exported="true"
             android:label="@string/app_name"
