@@ -2,7 +2,6 @@ package com.example.davaroutes
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -116,7 +115,11 @@ class UserDashboard : ComponentActivity() {
                         icon = R.drawable.ic_id_card,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
+                            val intent = Intent(activity, DriverProfileActivity::class.java)
+                            intent.putExtra("full_name", fullName)
+                            intent.putExtra("email", email)
+                            intent.putExtra("user_id", userId)
+                            activity.startActivity(intent)
                         }
                     )
                     ActionCard(
@@ -124,7 +127,8 @@ class UserDashboard : ComponentActivity() {
                         icon = R.drawable.ic_car,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
+                            val intent = Intent(activity, VehicleProfileActivity::class.java)
+                            activity.startActivity(intent)
                         }
                     )
                 }
@@ -140,7 +144,8 @@ class UserDashboard : ComponentActivity() {
                         icon = R.drawable.ic_lightning,
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
+                            val intent = Intent(activity, RecommendationsActivity::class.java)
+                            activity.startActivity(intent)
                         }
                     )
                      ActionCard(
@@ -148,7 +153,8 @@ class UserDashboard : ComponentActivity() {
                          icon = R.drawable.ic_clock,
                          modifier = Modifier.weight(1f),
                          onClick = {
-                             Toast.makeText(activity, "Coming soon", Toast.LENGTH_SHORT).show()
+                             val intent = Intent(activity, LastTripsActivity::class.java)
+                             activity.startActivity(intent)
                          }
                      )
                 }
@@ -223,7 +229,7 @@ class UserDashboard : ComponentActivity() {
                         color = SoftWhite
                     )
                     Text(
-                        text = "✓ OK",
+                        text = "OK",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF4CAF50),
                         fontWeight = FontWeight.SemiBold
