@@ -48,4 +48,3 @@ interface ApiService {
         @Body trip: TripRequest
     ): Response<TripResponse>
 }
-
