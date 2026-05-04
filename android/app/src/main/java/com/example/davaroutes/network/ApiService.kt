@@ -6,6 +6,7 @@ import com.example.davaroutes.data.RegisterRequest
 import com.example.davaroutes.data.RegisterResponse
 import com.example.davaroutes.data.BootstrapResponse
 import com.example.davaroutes.data.TripRequest
+import com.example.davaroutes.data.TripResponse
 import com.example.davaroutes.data.VehicleCreateRequest
 import com.example.davaroutes.data.VehicleResponse
 import retrofit2.Response
@@ -41,4 +42,10 @@ interface ApiService {
         @Header("Authorization") authorization: String,
         @Body vehicle: VehicleCreateRequest
     ): Response<VehicleResponse>
+
+    @POST("routes/preview")
+    suspend fun previewRoute(
+        @Body trip: TripRequest
+    ): Response<TripResponse>
 }
+

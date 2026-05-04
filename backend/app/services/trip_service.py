@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -10,22 +9,12 @@ from app.schemas import (
     RouteDTO,
     TripDTO,
     TripDetailResponse,
-    TripRecommendationDTO,
     TripStartRequest,
     TripStartResponse,
     TripUpdateRequest,
     TripUpdateResponse,
 )
-
-
-@dataclass(frozen=True)
-class MockRecommendation:
-    action: str
-    recommendation_type: str
-    item_type: str
-    title: str
-    reason: str
-    priority: str
+from app.services.routes_service import get_route
 
 
 def to_uuid(value: str, field_name: str) -> UUID:
@@ -48,12 +37,13 @@ def start_trip(
 
     vehicle = get_owned_vehicle(vehicle_id, current_user, db)
     driver_profile = get_owned_driver_profile(driver_profile_id, current_user, db)
-    vehicle_state = get_latest_vehicle_state(vehicle.id, db)
-    if vehicle_state is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No vehicle state snapshot found for vehicle.",
-        )
+
+    route_data = get_route(
+        origin_lat=payload.origin.lat,
+        origin_lng=payload.origin.lng,
+        dest_lat=payload.destination.lat,
+        dest_lng=payload.destination.lng,
+    )
 
     db_trip = dbm.Trip(
         user_id=current_user.id,
@@ -72,22 +62,13 @@ def start_trip(
     db.add(db_trip)
     db.flush()
 
-    selected_route = create_mock_route_for_trip(db_trip, vehicle, db)
-    recommendation = choose_mock_recommendation(vehicle_state)
-    db_recommendation, db_item = create_mock_recommendation(
-        db_trip,
-        selected_route,
-        recommendation,
-        db,
-    )
+    selected_route = create_route_option_for_trip(db_trip, route_data, db)
 
     db.commit()
     db.refresh(db_trip)
     db.refresh(selected_route)
-    db.refresh(db_recommendation)
-    db.refresh(db_item)
 
-    return build_trip_response(db_trip, selected_route, db_recommendation, db_item)
+    return build_trip_response(db_trip, selected_route)
 
 
 def get_trip(
@@ -115,31 +96,7 @@ def get_trip(
             detail="Selected route not found.",
         )
 
-    recommendation = (
-        db.query(dbm.Recommendation)
-        .filter(dbm.Recommendation.trip_id == trip.id)
-        .order_by(dbm.Recommendation.created_at.desc())
-        .first()
-    )
-    if recommendation is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Recommendation not found.",
-        )
-
-    item = (
-        db.query(dbm.RecommendationItem)
-        .filter(dbm.RecommendationItem.recommendation_id == recommendation.id)
-        .order_by(dbm.RecommendationItem.rank_position.asc())
-        .first()
-    )
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Recommendation item not found.",
-        )
-
-    return build_trip_response(trip, selected_route, recommendation, item)
+    return build_trip_response(trip, selected_route)
 
 
 def update_trip(
@@ -217,147 +174,31 @@ def get_owned_driver_profile(
     return driver_profile
 
 
-def get_latest_vehicle_state(
-    vehicle_id: UUID,
-    db: Session,
-) -> dbm.VehicleStateSnapshot | None:
-    return (
-        db.query(dbm.VehicleStateSnapshot)
-        .filter(dbm.VehicleStateSnapshot.vehicle_id == vehicle_id)
-        .order_by(dbm.VehicleStateSnapshot.captured_at.desc())
-        .first()
-    )
-
-
-def create_mock_route_for_trip(
+def create_route_option_for_trip(
     trip: dbm.Trip,
-    vehicle: dbm.Vehicle,
+    route_data: dict,
     db: Session,
 ) -> dbm.RouteOption:
-    distance_km = 168
-    estimated_fuel_liters = None
-    estimated_energy_kwh = None
-
-    if vehicle.consumption_l_per_100km is not None:
-        estimated_fuel_liters = round(
-            distance_km * float(vehicle.consumption_l_per_100km) / 100,
-            1,
-        )
-
-    if vehicle.consumption_kwh_per_100km is not None:
-        estimated_energy_kwh = round(
-            distance_km * float(vehicle.consumption_kwh_per_100km) / 100,
-            1,
-        )
-
     route = dbm.RouteOption(
         trip_id=trip.id,
-        provider="mock",
-        route_name="Mock fastest route",
-        polyline=None,
-        distance_km=distance_km,
-        duration_minutes=155,
-        traffic_duration_minutes=172,
-        estimated_energy_kwh=estimated_energy_kwh,
-        estimated_fuel_liters=estimated_fuel_liters,
+        provider="google",
+        route_name=None,
+        polyline=route_data["polyline"],
+        distance_km=route_data["distance_km"],
+        duration_minutes=route_data["duration_minutes"],
+        traffic_duration_minutes=None,
+        estimated_energy_kwh=None,
+        estimated_fuel_liters=None,
         estimated_cost=None,
-        toll_cost=0,
-        route_score=0.8,
+        toll_cost=None,
+        route_score=None,
         is_selected=True,
-        scoring_breakdown={"source": "mock_trip_flow"},
+        scoring_breakdown=None,
     )
 
     db.add(route)
     db.flush()
     return route
-
-
-def choose_mock_recommendation(
-    vehicle_state: dbm.VehicleStateSnapshot,
-) -> MockRecommendation:
-    if (
-        vehicle_state.fuel_level_percent is not None
-        and float(vehicle_state.fuel_level_percent) < 25
-    ):
-        return MockRecommendation(
-            action="STOP_FOR_FUEL",
-            recommendation_type="stop",
-            item_type="fuel_stop",
-            title="Stop for fuel soon",
-            reason="Fuel level is low. Plan a fuel stop before continuing.",
-            priority="high",
-        )
-
-    if (
-        vehicle_state.battery_soc_percent is not None
-        and float(vehicle_state.battery_soc_percent) < 25
-    ):
-        return MockRecommendation(
-            action="STOP_FOR_CHARGING",
-            recommendation_type="stop",
-            item_type="charging_stop",
-            title="Stop for charging soon",
-            reason="Battery level is low. Plan a charging stop before continuing.",
-            priority="high",
-        )
-
-    if vehicle_state.tire_pressure_status in {"low", "warning"}:
-        return MockRecommendation(
-            action="SERVICE_CHECK",
-            recommendation_type="service",
-            item_type="service_center",
-            title="Check tire pressure",
-            reason="Tire pressure warning was reported.",
-            priority="medium",
-        )
-
-    return MockRecommendation(
-        action="CONTINUE_TRIP",
-        recommendation_type="route",
-        item_type="route",
-        title="Continue your trip",
-        reason="Vehicle state looks good for this trip.",
-        priority="low",
-    )
-
-
-def create_mock_recommendation(
-    trip: dbm.Trip,
-    selected_route: dbm.RouteOption,
-    recommendation: MockRecommendation,
-    db: Session,
-) -> tuple[dbm.Recommendation, dbm.RecommendationItem]:
-    db_recommendation = dbm.Recommendation(
-        trip_id=trip.id,
-        recommendation_type=recommendation.recommendation_type,
-        selected_route_option_id=selected_route.id,
-        final_score=0.8,
-        explanation=recommendation.reason,
-        scoring_breakdown={
-            "source": "mock_trip_flow",
-            "action": recommendation.action,
-            "title": recommendation.title,
-            "priority": recommendation.priority,
-            "item_type": recommendation.item_type,
-        },
-    )
-
-    db.add(db_recommendation)
-    db.flush()
-
-    db_item = dbm.RecommendationItem(
-        recommendation_id=db_recommendation.id,
-        route_option_id=selected_route.id,
-        item_type=recommendation.item_type,
-        rank_position=1,
-        score=0.8,
-        reason=recommendation.reason,
-        accepted=None,
-    )
-
-    db.add(db_item)
-    db.flush()
-    return db_recommendation, db_item
 
 
 def should_refresh_recommendation(vehicle_state) -> bool:
@@ -380,11 +221,7 @@ def should_refresh_recommendation(vehicle_state) -> bool:
 def build_trip_response(
     trip: dbm.Trip,
     selected_route: dbm.RouteOption,
-    recommendation: dbm.Recommendation,
-    item: dbm.RecommendationItem,
 ) -> TripStartResponse:
-    metadata = recommendation.scoring_breakdown or {}
-
     return TripStartResponse(
         trip=TripDTO(
             id=str(trip.id),
@@ -401,34 +238,9 @@ def build_trip_response(
             ),
             requested_mode=trip.requested_mode,
         ),
-        selected_route=RouteDTO(
-            id=str(selected_route.id),
-            provider=selected_route.provider,
-            route_name=selected_route.route_name,
+        route=RouteDTO(
             distance_km=float(selected_route.distance_km or 0),
             duration_minutes=int(selected_route.duration_minutes or 0),
-            traffic_duration_minutes=int(selected_route.traffic_duration_minutes or 0),
-            estimated_fuel_liters=(
-                float(selected_route.estimated_fuel_liters)
-                if selected_route.estimated_fuel_liters is not None
-                else None
-            ),
-            estimated_energy_kwh=(
-                float(selected_route.estimated_energy_kwh)
-                if selected_route.estimated_energy_kwh is not None
-                else None
-            ),
-            toll_cost=float(selected_route.toll_cost or 0),
-            route_score=float(selected_route.route_score or 0),
-            is_selected=bool(selected_route.is_selected),
-        ),
-        recommendation=TripRecommendationDTO(
-            id=str(recommendation.id),
-            action=metadata.get("action", "CONTINUE_TRIP"),
-            type=recommendation.recommendation_type,
-            item_type=metadata.get("item_type", item.item_type),
-            title=metadata.get("title", "Continue your trip"),
-            reason=item.reason or recommendation.explanation,
-            priority=metadata.get("priority", "low"),
+            polyline=selected_route.polyline or "",
         ),
     )

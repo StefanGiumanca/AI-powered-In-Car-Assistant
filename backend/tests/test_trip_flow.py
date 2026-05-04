@@ -86,6 +86,19 @@ def auth_headers(user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+@pytest.fixture(autouse=True)
+def google_route_sample(monkeypatch):
+    route = {
+        "distance_km": 168.42,
+        "duration_minutes": 156,
+        "polyline": "encoded_polyline",
+    }
+
+    monkeypatch.setattr("app.services.trip_service.get_route", lambda **_: route)
+    monkeypatch.setattr("app.api.v1.routes.routes.get_route", lambda **_: route)
+    return route
+
+
 def create_user(db_session_factory, email: str = "demo@test.com") -> User:
     db = db_session_factory()
     try:
@@ -201,8 +214,57 @@ def test_start_trip_unauthorized_returns_401(db_session_factory):
     assert body["detail"] == "Not authenticated."
 
 
-def test_start_trip_success_creates_trip_route_recommendation_and_item(
+def test_preview_route_valid_request_returns_route(google_route_sample):
+    status, body = asyncio.run(
+        request_app(
+            "POST",
+            "/routes/preview",
+            {
+                "origin": {
+                    "label": "Current location",
+                    "lat": 44.4268,
+                    "lng": 26.1025,
+                },
+                "destination": {
+                    "label": "Brasov",
+                    "lat": 45.6579,
+                    "lng": 25.6012,
+                },
+            },
+        )
+    )
+
+    assert status == 200
+    assert body == google_route_sample
+
+
+def test_preview_route_invalid_coords_returns_422():
+    status, body = asyncio.run(
+        request_app(
+            "POST",
+            "/routes/preview",
+            {
+                "origin": {
+                    "label": "Current location",
+                    "lat": 144,
+                    "lng": 26.1025,
+                },
+                "destination": {
+                    "label": "Brasov",
+                    "lat": 45.6579,
+                    "lng": 25.6012,
+                },
+            },
+        )
+    )
+
+    assert status == 422
+    assert "detail" in body
+
+
+def test_start_trip_success_creates_trip_and_google_route(
     db_session_factory,
+    google_route_sample,
 ):
     user = create_user(db_session_factory)
     vehicle_id, profile_id = create_setup(db_session_factory, user)
@@ -210,17 +272,20 @@ def test_start_trip_success_creates_trip_route_recommendation_and_item(
     body = start_trip(db_session_factory, user, vehicle_id, profile_id)
 
     assert body["trip"]["status"] == "active"
-    assert body["selected_route"]["provider"] == "mock"
-    assert body["selected_route"]["route_name"] == "Mock fastest route"
-    assert body["selected_route"]["estimated_fuel_liters"] == 12.1
-    assert body["recommendation"]["action"] == "CONTINUE_TRIP"
+    assert body["route"] == google_route_sample
 
     db = db_session_factory()
     try:
         assert db.query(Trip).count() == 1
         assert db.query(RouteOption).count() == 1
-        assert db.query(Recommendation).count() == 1
-        assert db.query(RecommendationItem).count() == 1
+        route = db.query(RouteOption).one()
+        assert route.provider == "google"
+        assert route.is_selected is True
+        assert float(route.distance_km) == google_route_sample["distance_km"]
+        assert int(route.duration_minutes) == google_route_sample["duration_minutes"]
+        assert route.polyline == google_route_sample["polyline"]
+        assert db.query(Recommendation).count() == 0
+        assert db.query(RecommendationItem).count() == 0
     finally:
         db.close()
 
@@ -265,22 +330,16 @@ def test_start_trip_driver_profile_owned_by_another_user_returns_404(
     assert body["detail"] == "Driver profile not found."
 
 
-def test_start_trip_without_vehicle_state_returns_400(db_session_factory):
+def test_start_trip_routes_api_failure_returns_502(db_session_factory, monkeypatch):
     user = create_user(db_session_factory)
-    db = db_session_factory()
-    try:
-        vehicle = Vehicle(user_id=user.id, model="Dacia Duster", powertrain="ICE")
-        db.add(vehicle)
-        db.flush()
-        profile = DriverProfile(user_id=user.id, profile_type="balanced")
-        db.add(profile)
-        db.commit()
-        db.refresh(vehicle)
-        db.refresh(profile)
-        vehicle_id = str(vehicle.id)
-        profile_id = str(profile.id)
-    finally:
-        db.close()
+    vehicle_id, profile_id = create_setup(db_session_factory, user)
+
+    def fail_route(**_):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=502, detail="Google Routes API returned an error.")
+
+    monkeypatch.setattr("app.services.trip_service.get_route", fail_route)
 
     status, body = asyncio.run(
         request_app(
@@ -291,38 +350,8 @@ def test_start_trip_without_vehicle_state_returns_400(db_session_factory):
         )
     )
 
-    assert status == 400
-    assert body["detail"] == "No vehicle state snapshot found for vehicle."
-
-
-@pytest.mark.parametrize(
-    ("fuel", "battery", "tire_status", "expected_action"),
-    [
-        (18, None, "ok", "STOP_FOR_FUEL"),
-        (40, 18, "ok", "STOP_FOR_CHARGING"),
-        (40, None, "low", "SERVICE_CHECK"),
-        (40, None, "ok", "CONTINUE_TRIP"),
-    ],
-)
-def test_start_trip_recommendation_rules(
-    db_session_factory,
-    fuel,
-    battery,
-    tire_status,
-    expected_action,
-):
-    user = create_user(db_session_factory, email=f"{expected_action}@test.com")
-    vehicle_id, profile_id = create_setup(
-        db_session_factory,
-        user,
-        fuel_level_percent=fuel,
-        battery_soc_percent=battery,
-        tire_pressure_status=tire_status,
-    )
-
-    body = start_trip(db_session_factory, user, vehicle_id, profile_id)
-
-    assert body["recommendation"]["action"] == expected_action
+    assert status == 502
+    assert body["detail"] == "Google Routes API returned an error."
 
 
 def test_get_trip_unauthorized_returns_401(db_session_factory):
@@ -349,7 +378,7 @@ def test_user_can_get_own_trip(db_session_factory):
 
     assert status == 200
     assert body["trip"]["id"] == started["trip"]["id"]
-    assert body["recommendation"]["action"] == "CONTINUE_TRIP"
+    assert body["route"]["polyline"] == "encoded_polyline"
 
 
 def test_user_cannot_get_another_users_trip(db_session_factory):
@@ -421,7 +450,7 @@ def test_update_trip_success_creates_new_vehicle_state_snapshot(db_session_facto
     db = db_session_factory()
     try:
         assert db.query(VehicleStateSnapshot).count() == 2
-        assert db.query(Recommendation).count() == 1
+        assert db.query(Recommendation).count() == 0
     finally:
         db.close()
 

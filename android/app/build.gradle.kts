@@ -91,4 +91,6 @@ dependencies {
 
     // Material Icons
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
+
+    implementation("com.google.maps.android:android-maps-utils:3.8.2")
 }

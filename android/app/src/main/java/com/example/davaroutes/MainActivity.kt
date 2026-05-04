@@ -2,7 +2,6 @@ package com.example.davaroutes
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Activity.RESULT_OK
 import android.content.Intent
 import android.location.Location
 import android.os.Bundle
@@ -20,9 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
+import com.example.davaroutes.data.TripRequest
+import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
 import com.example.davaroutes.ui.theme.Orange
-import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -31,13 +32,16 @@ import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.widget.Autocomplete
 import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
+import com.google.maps.android.PolyUtil
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
 class MainActivity : ComponentActivity() {
 
@@ -90,6 +94,11 @@ class MainActivity : ComponentActivity() {
         var currentRange by remember { mutableStateOf("") }
         var routePreferences by remember { mutableStateOf("") }
 
+        var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+        var isLoadingRoute by remember { mutableStateOf(false) }
+        var distanceKm by remember { mutableStateOf<Double?>(null) }
+        var durationMinutes by remember { mutableStateOf<Double?>(null) }
+
         val cameraPositionState = rememberCameraPositionState()
 
         val placesLauncher = rememberLauncherForActivityResult(
@@ -102,6 +111,10 @@ class MainActivity : ComponentActivity() {
                 if (latLng != null) {
                     destinationLocation = latLng
                     destinationName = place.name ?: place.address ?: "Destinație selectată"
+
+                    routePoints = emptyList()
+                    distanceKm = null
+                    durationMinutes = null
 
                     lifecycleScope.launch {
                         cameraPositionState.move(
@@ -158,6 +171,14 @@ class MainActivity : ComponentActivity() {
                         title = destinationName
                     )
                 }
+
+                if (routePoints.isNotEmpty()) {
+                    Polyline(
+                        points = routePoints,
+                        color = Orange,
+                        width = 12f
+                    )
+                }
             }
 
             Button(
@@ -198,15 +219,30 @@ class MainActivity : ComponentActivity() {
                         Text("Destinație selectată")
                         Text(destinationName)
 
+                        distanceKm?.let { distance ->
+                            Text("Distanță: %.2f km".format(distance))
+                        }
+
+                        durationMinutes?.let { duration ->
+                            Text("Durată: %.0f minute".format(duration))
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
                             modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoadingRoute,
                             onClick = {
                                 showRouteForm = true
                             }
                         ) {
-                            Text("Go there")
+                            Text(
+                                if (isLoadingRoute) {
+                                    "Se caută ruta..."
+                                } else {
+                                    "Go there"
+                                }
+                            )
                         }
                     }
                 }
@@ -215,7 +251,9 @@ class MainActivity : ComponentActivity() {
             if (showRouteForm && destinationLocation != null) {
                 AlertDialog(
                     onDismissRequest = {
-                        showRouteForm = false
+                        if (!isLoadingRoute) {
+                            showRouteForm = false
+                        }
                     },
                     title = {
                         Text("Detalii traseu")
@@ -227,7 +265,8 @@ class MainActivity : ComponentActivity() {
                                 onValueChange = { currentRange = it },
                                 label = { Text("Range actual") },
                                 placeholder = { Text("Ex: 120 km") },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoadingRoute
                             )
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -239,14 +278,51 @@ class MainActivity : ComponentActivity() {
                                 placeholder = {
                                     Text("Ex: benzinării, restaurante, stații de încărcare")
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoadingRoute
                             )
+
+                            if (isLoadingRoute) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     },
                     confirmButton = {
                         Button(
+                            enabled = !isLoadingRoute,
                             onClick = {
-                                val destination = destinationLocation!!
+                                val origin = userLocation
+                                val destination = destinationLocation
+
+                                if (userId.isBlank()) {
+                                    Toast.makeText(
+                                        activity,
+                                        "User ID lipsă",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
+
+                                if (origin == null) {
+                                    Toast.makeText(
+                                        activity,
+                                        "Locația curentă lipsește",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
+
+                                if (destination == null) {
+                                    Toast.makeText(
+                                        activity,
+                                        "Destinația lipsește",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
 
                                 if (currentRange.isBlank()) {
                                     Toast.makeText(
@@ -257,38 +333,98 @@ class MainActivity : ComponentActivity() {
                                     return@Button
                                 }
 
-                                val createTripIntent = Intent(
-                                    activity,
-                                    CreateTripActivity::class.java
+                                val trip = TripRequest(
+                                    user_id = userId,
+                                    vehicle_id = "",
+                                    driver_profile_id = null,
+
+                                    origin_label = "Current location",
+                                    origin_lat = origin.latitude,
+                                    origin_lng = origin.longitude,
+
+                                    destination_label = destinationName,
+                                    destination_lat = destination.latitude,
+                                    destination_lng = destination.longitude,
+
+                                    departure_time = LocalDateTime.now().toString(),
+                                    requested_mode = "driver",
+
+                                    current_range = currentRange,
+                                    route_preferences = routePreferences
                                 )
 
-                                createTripIntent.putExtra("access_token", accessToken)
-                                createTripIntent.putExtra("token_type", tokenType)
-                                createTripIntent.putExtra("user_id", userId)
-                                createTripIntent.putExtra("email", email)
-                                createTripIntent.putExtra("full_name", fullName)
+                                lifecycleScope.launch {
+                                    try {
+                                        isLoadingRoute = true
 
-                                userLocation?.let { origin ->
-                                    createTripIntent.putExtra("origin_lat", origin.latitude)
-                                    createTripIntent.putExtra("origin_lng", origin.longitude)
+                                        val authorization = "$tokenType $accessToken"
+
+                                        val response = RetrofitClient.api.previewRoute(
+                                            trip = trip
+                                        )
+
+                                        if (response.isSuccessful) {
+                                            val route = response.body()
+
+                                            if (route != null) {
+                                                routePoints = PolyUtil.decode(route.polyline)
+                                                distanceKm = route.distance_km
+                                                durationMinutes = route.duration_minutes
+
+                                                showRouteForm = false
+
+                                                if (routePoints.isNotEmpty()) {
+                                                    cameraPositionState.move(
+                                                        CameraUpdateFactory.newLatLngZoom(
+                                                            routePoints.first(),
+                                                            12f
+                                                        )
+                                                    )
+                                                }
+
+                                                Toast.makeText(
+                                                    activity,
+                                                    "Ruta a fost generată",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    activity,
+                                                    "Răspuns gol de la server",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        } else {
+                                            Toast.makeText(
+                                                activity,
+                                                "Eroare server: ${response.code()}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(
+                                            activity,
+                                            "Eroare: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } finally {
+                                        isLoadingRoute = false
+                                    }
                                 }
-
-                                createTripIntent.putExtra("destination_lat", destination.latitude)
-                                createTripIntent.putExtra("destination_lng", destination.longitude)
-                                createTripIntent.putExtra("destination_name", destinationName)
-
-                                createTripIntent.putExtra("current_range", currentRange)
-                                createTripIntent.putExtra("route_preferences", routePreferences)
-
-                                showRouteForm = false
-                                startActivity(createTripIntent)
                             }
                         ) {
-                            Text("Caută ruta")
+                            Text(
+                                if (isLoadingRoute) {
+                                    "Se caută..."
+                                } else {
+                                    "Caută ruta"
+                                }
+                            )
                         }
                     },
                     dismissButton = {
                         TextButton(
+                            enabled = !isLoadingRoute,
                             onClick = {
                                 showRouteForm = false
                             }
