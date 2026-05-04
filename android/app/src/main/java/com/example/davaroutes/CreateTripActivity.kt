@@ -6,8 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,18 +15,36 @@ import com.example.davaroutes.data.TripRequest
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
 class CreateTripActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val userId = intent.getStringExtra("user_id") ?: ""
+        val originLat = intent.getDoubleExtra("origin_lat", 0.0)
+        val originLng = intent.getDoubleExtra("origin_lng", 0.0)
+
+        val destinationName = intent.getStringExtra("destination_name") ?: "Destination"
+        val destinationLat = intent.getDoubleExtra("destination_lat", 0.0)
+        val destinationLng = intent.getDoubleExtra("destination_lng", 0.0)
+
+        val currentRange = intent.getStringExtra("current_range") ?: ""
+        val routePreferences = intent.getStringExtra("route_preferences") ?: ""
+
         setContent {
             DavaRoutesTheme {
-                val userIdFromLogin = intent.getStringExtra("user_id") ?: ""
-
                 CreateTripScreen(
-                    initialUserId = userIdFromLogin
+                    userId = userId,
+                    originLat = originLat,
+                    originLng = originLng,
+                    destinationName = destinationName,
+                    destinationLat = destinationLat,
+                    destinationLng = destinationLng,
+                    initialCurrentRange = currentRange,
+                    initialRoutePreferences = routePreferences
                 )
             }
         }
@@ -36,76 +52,115 @@ class CreateTripActivity : ComponentActivity() {
 
     @Composable
     fun CreateTripScreen(
-        initialUserId: String
+        userId: String,
+        originLat: Double,
+        originLng: Double,
+        destinationName: String,
+        destinationLat: Double,
+        destinationLng: Double,
+        initialCurrentRange: String,
+        initialRoutePreferences: String
     ) {
-        var userId by remember { mutableStateOf(initialUserId) }
-        var vehicleId by remember { mutableStateOf("") }
-        var driverProfileId by remember { mutableStateOf("") }
-
-        var originLabel by remember { mutableStateOf("") }
-        var originLat by remember { mutableStateOf("") }
-        var originLng by remember { mutableStateOf("") }
-
-        var destinationLabel by remember { mutableStateOf("") }
-        var destinationLat by remember { mutableStateOf("") }
-        var destinationLng by remember { mutableStateOf("") }
-
-        var departureTime by remember { mutableStateOf("") }
-        var requestedMode by remember { mutableStateOf("") }
+        var currentRange by remember { mutableStateOf(initialCurrentRange) }
+        var routePreferences by remember { mutableStateOf(initialRoutePreferences) }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Create trip", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(32.dp))
 
-            OutlinedTextField(userId, { userId = it }, label = { Text("User ID") })
-            OutlinedTextField(vehicleId, { vehicleId = it }, label = { Text("Vehicle ID") })
-            OutlinedTextField(driverProfileId, { driverProfileId = it }, label = { Text("Driver Profile ID optional") })
+            Text(
+                text = "Configurează traseul",
+                style = MaterialTheme.typography.headlineMedium
+            )
 
-            OutlinedTextField(originLabel, { originLabel = it }, label = { Text("Origin label") })
-            OutlinedTextField(originLat, { originLat = it }, label = { Text("Origin latitude") })
-            OutlinedTextField(originLng, { originLng = it }, label = { Text("Origin longitude") })
-
-            OutlinedTextField(destinationLabel, { destinationLabel = it }, label = { Text("Destination label") })
-            OutlinedTextField(destinationLat, { destinationLat = it }, label = { Text("Destination latitude") })
-            OutlinedTextField(destinationLng, { destinationLng = it }, label = { Text("Destination longitude") })
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Plecare: locația ta curentă")
+                    Text("Destinație: $destinationName")
+                }
+            }
 
             OutlinedTextField(
-                departureTime,
-                { departureTime = it },
-                label = { Text("Departure time") },
-                placeholder = { Text("2026-04-29T10:00:00") }
+                value = currentRange,
+                onValueChange = { currentRange = it },
+                label = { Text("Range actual") },
+                placeholder = { Text("Ex: 120 km") },
+                modifier = Modifier.fillMaxWidth()
             )
 
             OutlinedTextField(
-                requestedMode,
-                { requestedMode = it },
-                label = { Text("Requested mode") },
-                placeholder = { Text("driver / passenger") }
+                value = routePreferences,
+                onValueChange = { routePreferences = it },
+                label = { Text("Preferințe pe traseu") },
+                placeholder = {
+                    Text("Ex: benzinării, restaurante, stații de încărcare")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3
             )
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
+                    if (userId.isBlank()) {
+                        Toast.makeText(
+                            this@CreateTripActivity,
+                            "User ID lipsă",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
+                    }
+
+                    if (
+                        originLat == 0.0 ||
+                        originLng == 0.0 ||
+                        destinationLat == 0.0 ||
+                        destinationLng == 0.0
+                    ) {
+                        Toast.makeText(
+                            this@CreateTripActivity,
+                            "Locația sau destinația lipsesc",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
+                    }
+
+                    if (currentRange.isBlank()) {
+                        Toast.makeText(
+                            this@CreateTripActivity,
+                            "Introdu range-ul actual",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@Button
+                    }
+
                     val trip = TripRequest(
                         user_id = userId,
-                        vehicle_id = vehicleId,
-                        driver_profile_id = driverProfileId.ifBlank { null },
+                        vehicle_id = "",
+                        driver_profile_id = null,
 
-                        origin_label = originLabel,
-                        origin_lat = originLat.toDoubleOrNull() ?: 0.0,
-                        origin_lng = originLng.toDoubleOrNull() ?: 0.0,
+                        origin_label = "Current location",
+                        origin_lat = originLat,
+                        origin_lng = originLng,
 
-                        destination_label = destinationLabel,
-                        destination_lat = destinationLat.toDoubleOrNull() ?: 0.0,
-                        destination_lng = destinationLng.toDoubleOrNull() ?: 0.0,
+                        destination_label = destinationName,
+                        destination_lat = destinationLat,
+                        destination_lng = destinationLng,
 
-                        departure_time = departureTime,
-                        requested_mode = requestedMode
+                        departure_time = LocalDateTime.now().toString(),
+                        requested_mode = "driver",
+
+                        current_range = currentRange,
+                        route_preferences = routePreferences
                     )
 
                     lifecycleScope.launch {
@@ -115,7 +170,7 @@ class CreateTripActivity : ComponentActivity() {
                             if (response.isSuccessful) {
                                 Toast.makeText(
                                     this@CreateTripActivity,
-                                    "Trip creat cu succes",
+                                    "Ruta a fost trimisă către server",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } else {
@@ -135,7 +190,7 @@ class CreateTripActivity : ComponentActivity() {
                     }
                 }
             ) {
-                Text("Send trip")
+                Text("Găsește ruta")
             }
         }
     }

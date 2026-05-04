@@ -1,4 +1,5 @@
 from .auth import AuthUserResponse, LoginRequest, LoginResponse, RegisterRequest
+from .bootstrap import BootstrapResponse
 from .common import (
     APIModel,
     CurrentLocationDTO,
@@ -6,6 +7,7 @@ from .common import (
     LabeledLocationDTO,
     NamedLocationDTO,
 )
+from .driver_profile import DriverProfileCreateRequest, DriverProfileResponse
 from .health import HealthResponse
 from .recommendations import (
     NextActionRequest,
@@ -17,20 +19,32 @@ from .recommendations import (
 )
 from .trips import (
     RouteDTO,
+    TripDTO,
+    TripDetailResponse,
+    TripRecommendationDTO,
     TripStartRequest,
     TripStartResponse,
     TripUpdateRequest,
     TripUpdateResponse,
+    TripUpdateVehicleStateDTO,
 )
-from .users import BootstrapResponse, DriverProfileDTO, UserDTO
-from .vehicles import VehicleDTO, VehicleStateDTO
+from .users import DriverProfileDTO, UserDTO
+from .vehicles import (
+    VehicleCreateRequest,
+    VehicleDTO,
+    VehicleResponse,
+    VehicleStateDTO,
+)
+from .vehicle_state import VehicleStateCreateRequest, VehicleStateResponse
 
 __all__ = [
     "APIModel",
     "AuthUserResponse",
     "BootstrapResponse",
     "CurrentLocationDTO",
+    "DriverProfileCreateRequest",
     "DriverProfileDTO",
+    "DriverProfileResponse",
     "HealthResponse",
     "IdentifiedLocationDTO",
     "LabeledLocationDTO",
@@ -45,11 +59,19 @@ __all__ = [
     "RecommendationEventResponse",
     "RegisterRequest",
     "RouteDTO",
+    "TripDTO",
+    "TripDetailResponse",
+    "TripRecommendationDTO",
     "TripStartRequest",
     "TripStartResponse",
     "TripUpdateRequest",
     "TripUpdateResponse",
+    "TripUpdateVehicleStateDTO",
     "UserDTO",
+    "VehicleCreateRequest",
     "VehicleDTO",
+    "VehicleResponse",
+    "VehicleStateCreateRequest",
     "VehicleStateDTO",
+    "VehicleStateResponse",
 ]

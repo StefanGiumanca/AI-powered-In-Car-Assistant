@@ -14,5 +14,8 @@ data class TripRequest (
     val destination_lng: Double,
 
     val departure_time: String,
-    val requested_mode: String
+    val requested_mode: String,
+
+    val current_range: String,
+    val route_preferences: String
 )
