@@ -8,6 +8,7 @@ from app.api.v1.routes.trips import router as trips_router
 from app.api.v1.routes.users import router as users_router
 from app.api.v1.routes.vehicle_state import router as vehicle_state_router
 from app.api.v1.routes.vehicles import router as vehicles_router
+from app.api.v1.routes.places import router as places_router
 
 
 app = FastAPI(
@@ -35,6 +36,7 @@ app.include_router(trips_router)
 app.include_router(recommendations_router)
 app.include_router(vehicle_state_router)
 app.include_router(vehicles_router)
+app.include_router(places_router)
 
 
 
