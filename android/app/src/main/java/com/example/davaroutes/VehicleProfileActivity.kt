@@ -1,8 +1,8 @@
 package com.example.davaroutes
 
 import android.os.Bundle
-import android.app.Activity.RESULT_OK
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,9 +24,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,10 +43,13 @@ import com.example.davaroutes.ui.theme.MutedText
 import com.example.davaroutes.ui.theme.NavyCard
 import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
+import com.example.davaroutes.data.EXTRA_DELETED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.example.davaroutes.data.VehicleResponse
 import com.example.davaroutes.data.vehiclesFromJson
+import com.example.davaroutes.network.RetrofitClient
+import kotlinx.coroutines.launch
 
 class VehicleProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,6 +82,8 @@ class VehicleProfileActivity : ComponentActivity() {
         selectedVehicleId: String?,
         activity: VehicleProfileActivity
     ) {
+        val vehicleList = remember { mutableStateOf(vehicles) }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -96,22 +105,28 @@ class VehicleProfileActivity : ComponentActivity() {
             }
 
             SectionTitle("Available Vehicles")
-            if (vehicles.isEmpty()) {
+            if (vehicleList.value.isEmpty()) {
                 EmptyVehicleCard(
                     accessToken = accessToken,
                     tokenType = tokenType,
                     activity = activity
                 )
             } else {
-                vehicles.forEach { vehicle ->
+                vehicleList.value.forEach { vehicle ->
                     VehicleCard(
                         vehicle = vehicle,
                         isSelected = vehicle.id == selectedVehicleId,
+                        accessToken = accessToken,
+                        tokenType = tokenType,
+                        activity = activity,
                         onSelect = {
                             val resultIntent = Intent()
                             resultIntent.putExtra(EXTRA_SELECTED_VEHICLE_ID, vehicle.id)
                             activity.setResult(RESULT_OK, resultIntent)
                             activity.finish()
+                        },
+                        onDelete = {
+                            vehicleList.value = vehicleList.value.filter { it.id != vehicle.id }
                         }
                     )
                 }
@@ -120,9 +135,9 @@ class VehicleProfileActivity : ComponentActivity() {
             SectionTitle("Service Monitor")
             InfoCard {
                 ComingSoonRow("Service interval alerts")
-                Divider(color = Color(0xFF35566B))
+                HorizontalDivider(color = Color(0xFF35566B))
                 ComingSoonRow("Odometer tracking")
-                Divider(color = Color(0xFF35566B))
+                HorizontalDivider(color = Color(0xFF35566B))
                 ComingSoonRow("Battery health history")
             }
 
@@ -174,8 +189,15 @@ class VehicleProfileActivity : ComponentActivity() {
     private fun VehicleCard(
         vehicle: VehicleResponse,
         isSelected: Boolean,
-        onSelect: () -> Unit
+        accessToken: String,
+        tokenType: String,
+        activity: VehicleProfileActivity,
+        onSelect: () -> Unit,
+        onDelete: () -> Unit
     ) {
+        val scope = rememberCoroutineScope()
+        val showDeleteConfirm = remember { mutableStateOf(false) }
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
@@ -200,7 +222,7 @@ class VehicleProfileActivity : ComponentActivity() {
                     )
                 }
 
-                Divider(color = Color(0xFF35566B))
+                HorizontalDivider(color = Color(0xFF35566B))
                 VehicleDetailRow("VIN", vehicle.vin ?: "Not set")
                 VehicleDetailRow("Connector", vehicle.connector_type ?: "Not set")
                 VehicleDetailRow("Battery", vehicle.battery_capacity_kwh?.let { "${it.cleanNumber()} kWh" } ?: "Not set")
@@ -208,21 +230,89 @@ class VehicleProfileActivity : ComponentActivity() {
                 VehicleDetailRow("Consumption", vehicle.consumptionLabel())
                 VehicleDetailRow("Service", vehicle.serviceLabel())
 
-                Button(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    enabled = !isSelected,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Orange,
-                        contentColor = Color.White,
-                        disabledContainerColor = Color(0xFF35566B),
-                        disabledContentColor = SoftWhite
-                    ),
-                    onClick = onSelect
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (isSelected) "Selected as Main Car" else "Use as Main Car")
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = !isSelected,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Orange,
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF35566B),
+                            disabledContentColor = SoftWhite
+                        ),
+                        onClick = onSelect
+                    ) {
+                        Text(if (isSelected) "Selected as Main Car" else "Use as Main Car")
+                    }
+
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE53935),
+                            contentColor = Color.White
+                        ),
+                        onClick = {
+                            showDeleteConfirm.value = true
+                        }
+                    ) {
+                        Text("Delete")
+                    }
                 }
             }
+        }
+        
+        if (showDeleteConfirm.value) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm.value = false },
+                title = { Text("Delete Vehicle", color = SoftWhite) },
+                text = { Text("Are you sure you want to delete ${vehicle.model}?", color = MutedText) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val response = RetrofitClient.api.deleteVehicle(
+                                        vehicleId = vehicle.id,
+                                        authorization = "$tokenType $accessToken"
+                                    )
+                                    if (response.isSuccessful) {
+                                        val resultIntent = Intent().apply {
+                                            putExtra(EXTRA_DELETED_VEHICLE_ID, vehicle.id)
+                                        }
+                                        activity.setResult(RESULT_OK, resultIntent)
+                                        Toast.makeText(activity, "Vehicle deleted successfully", Toast.LENGTH_SHORT).show()
+                                        onDelete()
+                                        showDeleteConfirm.value = false
+                                    } else {
+                                        Toast.makeText(activity, "Failed to delete vehicle", Toast.LENGTH_SHORT).show()
+                                        showDeleteConfirm.value = false
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(activity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    showDeleteConfirm.value = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                    ) {
+                        Text("Delete", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showDeleteConfirm.value = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF35566B))
+                    ) {
+                        Text("Cancel", color = SoftWhite)
+                    }
+                },
+                containerColor = NavyCard
+            )
         }
     }
 

@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken
 const val EXTRA_VEHICLES_JSON = "vehicles_json"
 const val EXTRA_SELECTED_VEHICLE_ID = "selected_vehicle_id"
 const val EXTRA_CREATED_VEHICLE_JSON = "created_vehicle_json"
+const val EXTRA_DELETED_VEHICLE_ID = "deleted_vehicle_id"
 
 const val VEHICLE_PREFS = "vehicle_preferences"
 const val PREF_MAIN_VEHICLE_ID = "main_vehicle_id"
