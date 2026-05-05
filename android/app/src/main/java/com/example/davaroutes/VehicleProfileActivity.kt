@@ -197,6 +197,7 @@ class VehicleProfileActivity : ComponentActivity() {
     ) {
         val scope = rememberCoroutineScope()
         val showDeleteConfirm = remember { mutableStateOf(false) }
+        val showDetails = remember { mutableStateOf(false) }
         
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -222,13 +223,30 @@ class VehicleProfileActivity : ComponentActivity() {
                     )
                 }
 
-                HorizontalDivider(color = Color(0xFF35566B))
-                VehicleDetailRow("VIN", vehicle.vin ?: "Not set")
-                VehicleDetailRow("Connector", vehicle.connector_type ?: "Not set")
-                VehicleDetailRow("Battery", vehicle.battery_capacity_kwh?.let { "${it.cleanNumber()} kWh" } ?: "Not set")
-                VehicleDetailRow("Fuel tank", vehicle.fuel_tank_liters?.let { "${it.cleanNumber()} L" } ?: "Not set")
-                VehicleDetailRow("Consumption", vehicle.consumptionLabel())
-                VehicleDetailRow("Service", vehicle.serviceLabel())
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF35566B),
+                        contentColor = SoftWhite
+                    ),
+                    onClick = { showDetails.value = !showDetails.value }
+                ) {
+                    Text(
+                        text = if (showDetails.value) "Hide details" else "Show details",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (showDetails.value) {
+                    HorizontalDivider(color = Color(0xFF35566B))
+                    VehicleDetailRow("VIN", vehicle.vin ?: "Not set")
+                    VehicleDetailRow("Connector", vehicle.connector_type ?: "Not set")
+                    VehicleDetailRow("Battery", vehicle.battery_capacity_kwh?.let { "${it.cleanNumber()} kWh" } ?: "Not set")
+                    VehicleDetailRow("Fuel tank", vehicle.fuel_tank_liters?.let { "${it.cleanNumber()} L" } ?: "Not set")
+                    VehicleDetailRow("Consumption", vehicle.consumptionLabel())
+                    VehicleDetailRow("Service", vehicle.serviceLabel())
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
