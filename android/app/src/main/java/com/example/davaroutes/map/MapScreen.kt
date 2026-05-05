@@ -30,7 +30,8 @@ import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.MainActivity
 import com.example.davaroutes.UserDashboard
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
-import com.example.davaroutes.data.TripRequest
+import com.example.davaroutes.data.RouteLocationDto
+import com.example.davaroutes.data.RoutePreviewRequest
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DarkNavy
 import com.example.davaroutes.ui.theme.NavyCard
@@ -39,6 +40,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.widget.Autocomplete
@@ -53,7 +55,6 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 
 @Composable
 fun MapScreen(
@@ -73,6 +74,7 @@ fun MapScreen(
     var showRouteForm by remember { mutableStateOf(false) }
     var currentRange by remember { mutableStateOf("") }
     var routePreferences by remember { mutableStateOf("") }
+    var showRoutePreview by remember { mutableStateOf(false) }
 
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var isLoadingRoute by remember { mutableStateOf(false) }
@@ -90,6 +92,7 @@ fun MapScreen(
         distanceKm = null
         durationMinutes = null
         showRouteForm = false
+        showRoutePreview = false
         currentRange = ""
         routePreferences = ""
 
@@ -116,6 +119,7 @@ fun MapScreen(
                 routePoints = emptyList()
                 distanceKm = null
                 durationMinutes = null
+                showRoutePreview = false
 
                 activity.lifecycleScope.launch {
                     cameraPositionState.animate(
@@ -156,6 +160,12 @@ fun MapScreen(
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+    }
+
+    LaunchedEffect(showRoutePreview, routePoints) {
+        if (showRoutePreview && routePoints.isNotEmpty()) {
+            cameraPositionState.animate(buildRouteCameraUpdate(routePoints))
+        }
     }
 
     Box(
@@ -218,9 +228,6 @@ fun MapScreen(
 
                 placesLauncher.launch(intent)
             },
-            onClearClick = {
-                clearDestination()
-            }
         )
 
         FloatingActionButton(
@@ -246,7 +253,7 @@ fun MapScreen(
             Text("☰")
         }
 
-        destinationLocation?.let {
+        if (destinationLocation != null && !showRoutePreview) {
             RouteSummaryCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -265,28 +272,57 @@ fun MapScreen(
             )
         }
 
-        FloatingActionButton(
-            modifier = Modifier
-                .padding(start = 16.dp, bottom = 16.dp)
-                .align(Alignment.BottomStart),
-            containerColor = Orange,
-            contentColor = Color.White,
-            onClick = {
-                if (permissionGranted) {
-                    getUserLocation(activity, cameraPositionState) { location ->
-                        userLocation = location
-                    }
-                } else {
-                    permissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        )
-                    )
+        if (destinationLocation != null && showRoutePreview) {
+            RoutePreviewActionsCard(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                    .fillMaxWidth(),
+                destinationName = destinationName,
+                distanceKm = distanceKm,
+                durationMinutes = durationMinutes,
+                currentRange = currentRange,
+                routePreferences = routePreferences,
+                onChangeDetailsClick = {
+                    showRouteForm = true
+                },
+                onStartTripClick = {
+                    Toast.makeText(
+                        activity,
+                        "Trip start va fi legat de endpoint-ul dedicat",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                onCancelClick = {
+                    clearDestination()
                 }
+            )
+        }
+
+        if (!showRoutePreview) {
+            FloatingActionButton(
+                modifier = Modifier
+                    .padding(start = 16.dp, bottom = 16.dp)
+                    .align(Alignment.BottomStart),
+                containerColor = Orange,
+                contentColor = Color.White,
+                onClick = {
+                    if (permissionGranted) {
+                        getUserLocation(activity, cameraPositionState) { location ->
+                            userLocation = location
+                        }
+                    } else {
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                }
+            ) {
+                Text("📍")
             }
-        ) {
-            Text("📍")
         }
 
         FloatingActionButton(
@@ -294,7 +330,11 @@ fun MapScreen(
                 .align(Alignment.BottomEnd)
                 .padding(
                     end = 16.dp,
-                    bottom = if (destinationLocation != null) 260.dp else 16.dp
+                    bottom = when {
+                        showRoutePreview -> 292.dp
+                        destinationLocation != null -> 260.dp
+                        else -> 16.dp
+                    }
                 )
                 .size(52.dp),
             containerColor = NavyCard,
@@ -342,22 +382,17 @@ fun MapScreen(
                         return@RouteDetailsDialog
                     }
 
-                    val trip = TripRequest(
-                        user_id = userId,
-                        vehicle_id = "",
-                        driver_profile_id = null,
-
-                        origin_label = "Current location",
-                        origin_lat = origin.latitude,
-                        origin_lng = origin.longitude,
-
-                        destination_label = destinationName,
-                        destination_lat = destination.latitude,
-                        destination_lng = destination.longitude,
-
-                        departure_time = LocalDateTime.now().toString(),
-                        requested_mode = "driver",
-
+                    val routePreviewRequest = RoutePreviewRequest(
+                        origin = RouteLocationDto(
+                            label = "Current location",
+                            lat = origin.latitude,
+                            lng = origin.longitude
+                        ),
+                        destination = RouteLocationDto(
+                            label = destinationName,
+                            lat = destination.latitude,
+                            lng = destination.longitude
+                        ),
                         current_range = currentRange,
                         route_preferences = routePreferences
                     )
@@ -367,7 +402,7 @@ fun MapScreen(
                             isLoadingRoute = true
 
                             val response = RetrofitClient.api.previewRoute(
-                                trip = trip
+                                trip = routePreviewRequest
                             )
 
                             if (response.isSuccessful) {
@@ -379,15 +414,7 @@ fun MapScreen(
                                     durationMinutes = route.duration_minutes
 
                                     showRouteForm = false
-
-                                    if (routePoints.isNotEmpty()) {
-                                        cameraPositionState.animate(
-                                            CameraUpdateFactory.newLatLngZoom(
-                                                routePoints.first(),
-                                                12f
-                                            )
-                                        )
-                                    }
+                                    showRoutePreview = true
 
                                     Toast.makeText(
                                         activity,
@@ -464,4 +491,17 @@ private fun getUserLocation(
             ).show()
             onLocationReceived(null)
         }
+}
+
+private fun buildRouteCameraUpdate(routePoints: List<LatLng>): com.google.android.gms.maps.CameraUpdate {
+    if (routePoints.size == 1) {
+        return CameraUpdateFactory.newLatLngZoom(routePoints.first(), 15f)
+    }
+
+    val boundsBuilder = LatLngBounds.builder()
+    routePoints.forEach { point ->
+        boundsBuilder.include(point)
+    }
+
+    return CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 140)
 }

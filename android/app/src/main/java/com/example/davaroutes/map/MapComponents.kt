@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -15,6 +13,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -34,7 +33,6 @@ import com.example.davaroutes.ui.theme.SoftWhite
 fun SearchDestinationCard(
     destinationName: String,
     onSearchClick: () -> Unit,
-    onClearClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -65,18 +63,6 @@ fun SearchDestinationCard(
                 )
             }
 
-            if (destinationName.isNotBlank()) {
-                TextButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onClearClick
-                ) {
-                    Text(
-                        text = "Cancel destination",
-                        color = Orange,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
     }
 }
@@ -166,6 +152,96 @@ fun RouteInfoRow(
     ) {
         Text(label, color = MutedText)
         Text(value, color = SoftWhite, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun RoutePreviewActionsCard(
+    destinationName: String,
+    distanceKm: Double?,
+    durationMinutes: Double?,
+    currentRange: String,
+    routePreferences: String,
+    onChangeDetailsClick: () -> Unit,
+    onStartTripClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = NavyCard.copy(alpha = 0.96f))
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Route preview",
+                color = Orange,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = destinationName,
+                color = SoftWhite,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            distanceKm?.let {
+                RouteInfoRow("Distance", "%.2f km".format(it))
+            }
+
+            durationMinutes?.let {
+                RouteInfoRow("Duration", "%.0f minutes".format(it))
+            }
+
+            if (currentRange.isNotBlank()) {
+                RouteInfoRow("Range", currentRange)
+            }
+
+            if (routePreferences.isNotBlank()) {
+                Text(
+                    text = routePreferences,
+                    color = MutedText,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Orange),
+                    onClick = onChangeDetailsClick
+                ) {
+                    Text("Details")
+                }
+
+                Button(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Orange,
+                        contentColor = Color.White
+                    ),
+                    onClick = onStartTripClick
+                ) {
+                    Text("Start trip", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            TextButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onCancelClick
+            ) {
+                Text("Cancel", color = Orange, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

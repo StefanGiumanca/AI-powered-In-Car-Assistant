@@ -230,6 +230,8 @@ def test_preview_route_valid_request_returns_route(google_route_sample):
                     "lat": 45.6579,
                     "lng": 25.6012,
                 },
+                "current_range": "120 km",
+                "route_preferences": "chargers and restaurants",
             },
         )
     )
