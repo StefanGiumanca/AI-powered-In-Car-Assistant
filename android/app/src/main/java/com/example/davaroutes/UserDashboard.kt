@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.davaroutes.data.EXTRA_CREATED_VEHICLE_JSON
+import com.example.davaroutes.data.EXTRA_DELETED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.example.davaroutes.data.PREF_MAIN_VEHICLE_ID
@@ -114,7 +115,16 @@ class UserDashboard : ComponentActivity() {
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             if (result.resultCode == RESULT_OK) {
+                val deletedId = result.data?.getStringExtra(EXTRA_DELETED_VEHICLE_ID)
                 val selectedId = result.data?.getStringExtra(EXTRA_SELECTED_VEHICLE_ID)
+
+                if (!deletedId.isNullOrBlank()) {
+                    vehicles = vehicles.filterNot { it.id == deletedId }
+                    if (selectedVehicleId == deletedId) {
+                        selectedVehicleId = vehicles.firstOrNull()?.id
+                        preferences.edit().putString(PREF_MAIN_VEHICLE_ID, selectedVehicleId).apply()
+                    }
+                }
 
                 if (!selectedId.isNullOrBlank()) {
                     selectedVehicleId = selectedId

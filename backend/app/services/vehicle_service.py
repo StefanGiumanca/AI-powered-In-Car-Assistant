@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.models import User, Vehicle
@@ -71,3 +72,21 @@ def create_vehicle(
     db.refresh(vehicle)
 
     return vehicle_to_response(vehicle)
+
+
+def delete_vehicle(
+    db: Session,
+    current_user: User,
+    vehicle_id: str,
+) -> None:
+    """Delete a vehicle if it belongs to current user"""
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == vehicle_id,
+        Vehicle.user_id == current_user.id,
+    ).first()
+
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    db.delete(vehicle)
+    db.commit()
