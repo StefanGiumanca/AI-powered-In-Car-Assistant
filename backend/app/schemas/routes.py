@@ -12,6 +12,8 @@ class RouteDTO(APIModel):
 class RoutePreviewRequest(APIModel):
     origin: LabeledLocationDTO
     destination: LabeledLocationDTO
+    current_range: str | None = Field(default=None, max_length=100)
+    route_preferences: str | None = Field(default=None, max_length=500)
 
 
 class RoutePreviewResponse(RouteDTO):

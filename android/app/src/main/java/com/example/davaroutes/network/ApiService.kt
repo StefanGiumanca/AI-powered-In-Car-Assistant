@@ -5,6 +5,7 @@ import com.example.davaroutes.data.LoginResponse
 import com.example.davaroutes.data.RegisterRequest
 import com.example.davaroutes.data.RegisterResponse
 import com.example.davaroutes.data.BootstrapResponse
+import com.example.davaroutes.data.RoutePreviewRequest
 import com.example.davaroutes.data.TripRequest
 import com.example.davaroutes.data.TripResponse
 import com.example.davaroutes.data.VehicleCreateRequest
@@ -45,6 +46,6 @@ interface ApiService {
 
     @POST("routes/preview")
     suspend fun previewRoute(
-        @Body trip: TripRequest
+        @Body trip: RoutePreviewRequest
     ): Response<TripResponse>
 }
