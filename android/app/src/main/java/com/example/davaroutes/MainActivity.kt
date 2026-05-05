@@ -15,8 +15,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        if (!Places.isInitialized()) {
-            Places.initialize(applicationContext, BuildConfig.GOOGLE_MAPS_API_KEY)
+        val googleMapsApiKey = BuildConfig.GOOGLE_MAPS_API_KEY
+
+        if (googleMapsApiKey.isNotBlank() && !Places.isInitialized()) {
+            Places.initialize(applicationContext, googleMapsApiKey)
         }
 
         val accessToken = intent.getStringExtra("access_token") ?: ""
