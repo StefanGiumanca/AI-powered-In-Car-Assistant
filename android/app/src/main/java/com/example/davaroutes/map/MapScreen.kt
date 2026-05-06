@@ -233,33 +233,10 @@ fun MapScreen(
             }
         }
 
-        SearchDestinationCard(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 56.dp, start = 16.dp, end = 78.dp)
-                .fillMaxWidth(),
-            destinationName = destinationName,
-            onSearchClick = {
-                val fields = listOf(
-                    Place.Field.ID,
-                    Place.Field.NAME,
-                    Place.Field.ADDRESS,
-                    Place.Field.LAT_LNG
-                )
-
-                val intent = Autocomplete.IntentBuilder(
-                    AutocompleteActivityMode.OVERLAY,
-                    fields
-                ).build(activity)
-
-                placesLauncher.launch(intent)
-            },
-        )
-
         FloatingActionButton(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 56.dp, end = 16.dp)
+                .align(Alignment.TopStart)
+                .padding(top = 56.dp, start = 16.dp)
                 .size(52.dp),
             containerColor = Orange,
             contentColor = Color.White,
@@ -283,7 +260,7 @@ fun MapScreen(
             RouteSummaryCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                     .fillMaxWidth(),
                 destinationName = destinationName,
                 distanceKm = distanceKm,
@@ -336,10 +313,10 @@ fun MapScreen(
             )
         }
 
-        if (!showRoutePreview) {
+        if (!showRoutePreview && destinationLocation == null) {
             FloatingActionButton(
                 modifier = Modifier
-                    .padding(start = 16.dp, bottom = 16.dp)
+                    .padding(start = 16.dp, bottom = 158.dp)
                     .align(Alignment.BottomStart),
                 containerColor = Orange,
                 contentColor = Color.White,
@@ -362,13 +339,13 @@ fun MapScreen(
             }
         }
 
-        if (!showRoutePreview) {
+        if (!showRoutePreview && destinationLocation == null) {
             FloatingActionButton(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(
                         end = 16.dp,
-                        bottom = if (destinationLocation != null) 260.dp else 16.dp
+                        bottom = 158.dp
                     )
                     .size(52.dp),
                 containerColor = NavyCard,
@@ -379,6 +356,29 @@ fun MapScreen(
             ) {
                 Text(if (isDarkMap) "☀️" else "🌙")
             }
+        }
+
+        if (destinationLocation == null) {
+            SearchDestinationCard(
+                modifier = Modifier
+                    .fillMaxSize(),
+                destinationName = destinationName,
+                onSearchClick = {
+                    val fields = listOf(
+                        Place.Field.ID,
+                        Place.Field.NAME,
+                        Place.Field.ADDRESS,
+                        Place.Field.LAT_LNG
+                    )
+
+                    val intent = Autocomplete.IntentBuilder(
+                        AutocompleteActivityMode.OVERLAY,
+                        fields
+                    ).build(activity)
+
+                    placesLauncher.launch(intent)
+                },
+            )
         }
 
         if (showRouteForm && destinationLocation != null) {

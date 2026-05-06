@@ -5,17 +5,25 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,10 +39,20 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.example.davaroutes.ui.theme.MutedText
 import com.example.davaroutes.ui.theme.NavyCard
 import com.example.davaroutes.ui.theme.Orange
@@ -48,34 +66,137 @@ fun SearchDestinationCard(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = NavyCard.copy(alpha = 0.96f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val collapsedHeight = 136.dp
+        val maxSheetHeight = maxHeight - 104.dp
+        val minHeightPx = with(density) { collapsedHeight.toPx() }
+        val maxHeightPx = with(density) { maxSheetHeight.toPx() }
+        val halfHeightPx = (minHeightPx + maxHeightPx) / 2f
+        var sheetHeightPx by remember { mutableFloatStateOf(minHeightPx) }
+        var sheetStage by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(maxHeightPx) {
+            sheetHeightPx = sheetHeightPx.coerceIn(minHeightPx, maxHeightPx)
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            Button(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF35566B),
-                    contentColor = SoftWhite
-                ),
-                onClick = onSearchClick
+                    .height(with(density) { sheetHeightPx.toDp() }),
+                shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = NavyCard.copy(alpha = 0.96f)
+                )
             ) {
+                Column(
+                    modifier = Modifier.padding(start = 12.dp, top = 10.dp, end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(54.dp)
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MutedText.copy(alpha = 0.72f))
+                            .clickable {
+                                sheetStage = (sheetStage + 1) % 3
+                                sheetHeightPx = when (sheetStage) {
+                                    1 -> halfHeightPx
+                                    2 -> maxHeightPx
+                                    else -> minHeightPx
+                                }
+                            }
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    sheetHeightPx = (sheetHeightPx - dragAmount)
+                                        .coerceIn(minHeightPx, maxHeightPx)
+                                    sheetStage = when {
+                                        sheetHeightPx >= maxHeightPx - 12f -> 2
+                                        sheetHeightPx >= halfHeightPx - 12f -> 1
+                                        else -> 0
+                                    }
+                                }
+                            }
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(58.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = onSearchClick)
+                            .background(Color(0xFF35566B))
+                            .padding(start = 16.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = Orange
+                        )
+
+                        Text(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 10.dp),
+                            text = destinationName.ifBlank { "Search destination" },
+                            color = SoftWhite,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+
+                        IconButton(onClick = onSearchClick) {
+                            Icon(
+                                imageVector = Icons.Filled.Mic,
+                                contentDescription = "Voice search",
+                                tint = SoftWhite
+                            )
+                        }
+                    }
+
+                    SearchHistoryContent(
+                        showEmptyState = sheetHeightPx > minHeightPx + with(density) { 44.dp.toPx() }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistoryContent(
+    showEmptyState: Boolean
+) {
+    AnimatedVisibility(
+        visible = true,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it })
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Search History",
+                color = Orange,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            if (showEmptyState) {
                 Text(
-                    text = destinationName.ifBlank { "Search destination" },
-                    fontWeight = FontWeight.SemiBold
+                    text = "No recent searches",
+                    color = MutedText,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
-
         }
     }
 }
