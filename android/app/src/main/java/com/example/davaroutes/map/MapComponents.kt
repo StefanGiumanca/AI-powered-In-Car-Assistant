@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -38,18 +40,24 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
@@ -59,18 +67,22 @@ import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 
 @Composable
 fun SearchDestinationCard(
     destinationName: String,
-    onSearchClick: () -> Unit,
+    query: String,
+    predictions: List<PlacePredictionUi>,
+    isLoading: Boolean,
+    onQueryChange: (String) -> Unit,
+    onPredictionClick: (PlacePredictionUi) -> Unit,
     onVoiceClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier) {
         val density = LocalDensity.current
+        val focusRequester = remember { FocusRequester() }
+        val keyboardController = LocalSoftwareKeyboardController.current
         val collapsedHeight = 136.dp
         val maxSheetHeight = maxHeight - 104.dp
         val minHeightPx = with(density) { collapsedHeight.toPx() }
@@ -78,9 +90,30 @@ fun SearchDestinationCard(
         val halfHeightPx = (minHeightPx + maxHeightPx) / 2f
         var sheetHeightPx by remember { mutableFloatStateOf(minHeightPx) }
         var sheetStage by remember { mutableIntStateOf(0) }
+        var isSearchFocused by remember { mutableStateOf(false) }
 
         LaunchedEffect(maxHeightPx) {
             sheetHeightPx = sheetHeightPx.coerceIn(minHeightPx, maxHeightPx)
+        }
+
+        LaunchedEffect(isSearchFocused) {
+            if (isSearchFocused) {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            }
+        }
+
+        fun expandSearch() {
+            sheetStage = 2
+            sheetHeightPx = maxHeightPx
+            isSearchFocused = true
+        }
+
+        fun collapseSearch() {
+            sheetStage = 0
+            sheetHeightPx = minHeightPx
+            isSearchFocused = false
+            keyboardController?.hide()
         }
 
         Box(
@@ -108,11 +141,16 @@ fun SearchDestinationCard(
                             .clip(RoundedCornerShape(50))
                             .background(MutedText.copy(alpha = 0.72f))
                             .clickable {
-                                sheetStage = (sheetStage + 1) % 3
-                                sheetHeightPx = when (sheetStage) {
-                                    1 -> halfHeightPx
-                                    2 -> maxHeightPx
-                                    else -> minHeightPx
+                                if (sheetStage == 2) {
+                                    collapseSearch()
+                                } else {
+                                    sheetStage = (sheetStage + 1) % 3
+                                    sheetHeightPx = when (sheetStage) {
+                                        1 -> halfHeightPx
+                                        2 -> maxHeightPx
+                                        else -> minHeightPx
+                                    }
+                                    isSearchFocused = sheetStage == 2
                                 }
                             }
                             .pointerInput(Unit) {
@@ -125,6 +163,7 @@ fun SearchDestinationCard(
                                         sheetHeightPx >= halfHeightPx - 12f -> 1
                                         else -> 0
                                     }
+                                    isSearchFocused = sheetStage == 2
                                 }
                             }
                     )
@@ -134,7 +173,7 @@ fun SearchDestinationCard(
                             .fillMaxWidth()
                             .height(58.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable(onClick = onSearchClick)
+                            .clickable(onClick = ::expandSearch)
                             .background(Color(0xFF35566B))
                             .padding(start = 16.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -145,15 +184,40 @@ fun SearchDestinationCard(
                             tint = Orange
                         )
 
-                        Text(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 10.dp),
-                            text = destinationName.ifBlank { "Search destination" },
-                            color = SoftWhite,
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (isSearchFocused) {
+                            TextField(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(focusRequester),
+                                value = query,
+                                onValueChange = onQueryChange,
+                                placeholder = {
+                                    Text("Search destination")
+                                },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedTextColor = SoftWhite,
+                                    unfocusedTextColor = SoftWhite,
+                                    cursorColor = Orange,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedPlaceholderColor = MutedText,
+                                    unfocusedPlaceholderColor = MutedText
+                                )
+                            )
+                        } else {
+                            Text(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 10.dp),
+                                text = destinationName.ifBlank { "Search destination" },
+                                color = SoftWhite,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
 
                         IconButton(onClick = onVoiceClick) {
                             Icon(
@@ -164,9 +228,84 @@ fun SearchDestinationCard(
                         }
                     }
 
-                    SearchHistoryContent(
-                        showEmptyState = sheetHeightPx > minHeightPx + with(density) { 44.dp.toPx() }
+                    if (isSearchFocused && (query.isNotBlank() || isLoading)) {
+                        SearchPredictionContent(
+                            predictions = predictions,
+                            isLoading = isLoading,
+                            onPredictionClick = { prediction ->
+                                collapseSearch()
+                                onPredictionClick(prediction)
+                            }
+                        )
+                    } else {
+                        SearchHistoryContent(
+                            showEmptyState = sheetHeightPx > minHeightPx + with(density) { 44.dp.toPx() }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchPredictionContent(
+    predictions: List<PlacePredictionUi>,
+    isLoading: Boolean,
+    onPredictionClick: (PlacePredictionUi) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Suggestions",
+            color = Orange,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        if (isLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = Orange
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(360.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(predictions) { prediction ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onPredictionClick(prediction) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF243D50)
                     )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = prediction.primaryText,
+                            color = SoftWhite,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        if (prediction.secondaryText.isNotBlank()) {
+                            Text(
+                                text = prediction.secondaryText,
+                                color = MutedText,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
         }

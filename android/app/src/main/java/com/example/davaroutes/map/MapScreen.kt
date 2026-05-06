@@ -98,7 +98,6 @@ fun MapScreen(
     var distanceKm by remember { mutableStateOf<Double?>(null) }
     var durationMinutes by remember { mutableStateOf<Double?>(null) }
 
-    var showDestinationSearch by remember { mutableStateOf(false) }
     var destinationQuery by remember { mutableStateOf("") }
     var destinationPredictions by remember { mutableStateOf<List<PlacePredictionUi>>(emptyList()) }
     var isLoadingPredictions by remember { mutableStateOf(false) }
@@ -756,7 +755,6 @@ fun MapScreen(
                 isRoutePreviewExpanded = false
                 showRouteForm = false
 
-                showDestinationSearch = false
                 destinationQuery = ""
                 destinationPredictions = emptyList()
                 autocompleteSessionToken = AutocompleteSessionToken.newInstance()
@@ -1029,20 +1027,14 @@ fun MapScreen(
                 modifier = Modifier
                     .fillMaxSize(),
                 destinationName = destinationName,
-                onSearchClick = {
-                    val fields = listOf(
-                        Place.Field.ID,
-                        Place.Field.NAME,
-                        Place.Field.ADDRESS,
-                        Place.Field.LAT_LNG
-                    )
-
-                    val intent = Autocomplete.IntentBuilder(
-                        AutocompleteActivityMode.OVERLAY,
-                        fields
-                    ).build(activity)
-
-                    placesLauncher.launch(intent)
+                query = destinationQuery,
+                predictions = destinationPredictions,
+                isLoading = isLoadingPredictions,
+                onQueryChange = { query ->
+                    searchDestinationPredictions(query)
+                },
+                onPredictionClick = { prediction ->
+                    selectDestinationPrediction(prediction)
                 },
                 onVoiceClick = {
                     requestOrStartVoiceInput()
@@ -1059,25 +1051,6 @@ fun MapScreen(
                     .background(NavyCard)
                     .padding(12.dp),
                 color = Color.White
-            )
-        }
-
-        if (showDestinationSearch) {
-            DestinationSearchDialog(
-                query = destinationQuery,
-                predictions = destinationPredictions,
-                isLoading = isLoadingPredictions,
-                onQueryChange = { query ->
-                    searchDestinationPredictions(query)
-                },
-                onPredictionClick = { prediction ->
-                    selectDestinationPrediction(prediction)
-                },
-                onDismiss = {
-                    showDestinationSearch = false
-                    destinationQuery = ""
-                    destinationPredictions = emptyList()
-                }
             )
         }
 
