@@ -54,8 +54,6 @@ import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
-import com.google.android.libraries.places.widget.Autocomplete
-import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
@@ -98,7 +96,6 @@ fun MapScreen(
     var distanceKm by remember { mutableStateOf<Double?>(null) }
     var durationMinutes by remember { mutableStateOf<Double?>(null) }
 
-    var showDestinationSearch by remember { mutableStateOf(false) }
     var destinationQuery by remember { mutableStateOf("") }
     var destinationPredictions by remember { mutableStateOf<List<PlacePredictionUi>>(emptyList()) }
     var isLoadingPredictions by remember { mutableStateOf(false) }
@@ -756,7 +753,6 @@ fun MapScreen(
                 isRoutePreviewExpanded = false
                 showRouteForm = false
 
-                showDestinationSearch = false
                 destinationQuery = ""
                 destinationPredictions = emptyList()
                 autocompleteSessionToken = AutocompleteSessionToken.newInstance()
@@ -774,33 +770,6 @@ fun MapScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             }
-    }
-
-    val placesLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
-            val place = Autocomplete.getPlaceFromIntent(result.data!!)
-            val latLng = place.latLng
-
-            if (latLng != null) {
-                destinationLocation = latLng
-                destinationName = place.name ?: place.address ?: "Selected destination"
-                destinationAddress = place.address ?: ""
-
-                routePoints = emptyList()
-                distanceKm = null
-                durationMinutes = null
-                showRoutePreview = false
-                isRoutePreviewExpanded = false
-
-                activity.lifecycleScope.launch {
-                    cameraPositionState.animate(
-                        CameraUpdateFactory.newLatLngZoom(latLng, 15f)
-                    )
-                }
-            }
-        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -1029,20 +998,14 @@ fun MapScreen(
                 modifier = Modifier
                     .fillMaxSize(),
                 destinationName = destinationName,
-                onSearchClick = {
-                    val fields = listOf(
-                        Place.Field.ID,
-                        Place.Field.NAME,
-                        Place.Field.ADDRESS,
-                        Place.Field.LAT_LNG
-                    )
-
-                    val intent = Autocomplete.IntentBuilder(
-                        AutocompleteActivityMode.OVERLAY,
-                        fields
-                    ).build(activity)
-
-                    placesLauncher.launch(intent)
+                query = destinationQuery,
+                predictions = destinationPredictions,
+                isLoading = isLoadingPredictions,
+                onQueryChange = { query ->
+                    searchDestinationPredictions(query)
+                },
+                onPredictionClick = { prediction ->
+                    selectDestinationPrediction(prediction)
                 },
                 onVoiceClick = {
                     requestOrStartVoiceInput()
@@ -1059,25 +1022,6 @@ fun MapScreen(
                     .background(NavyCard)
                     .padding(12.dp),
                 color = Color.White
-            )
-        }
-
-        if (showDestinationSearch) {
-            DestinationSearchDialog(
-                query = destinationQuery,
-                predictions = destinationPredictions,
-                isLoading = isLoadingPredictions,
-                onQueryChange = { query ->
-                    searchDestinationPredictions(query)
-                },
-                onPredictionClick = { prediction ->
-                    selectDestinationPrediction(prediction)
-                },
-                onDismiss = {
-                    showDestinationSearch = false
-                    destinationQuery = ""
-                    destinationPredictions = emptyList()
-                }
             )
         }
 

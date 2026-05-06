@@ -125,7 +125,8 @@ fun EmbeddedNavigationScreen(
                         navigator = readyNavigator,
                         destinationName = destinationName,
                         destinationLat = destinationLat,
-                        destinationLng = destinationLng
+                        destinationLng = destinationLng,
+                        isSoundEnabled = { isSoundEnabled }
                     )
                 }
 
@@ -180,14 +181,9 @@ fun EmbeddedNavigationScreen(
                 isNavigationCardExpanded = !isNavigationCardExpanded
             },
             onToggleSound = {
-                isSoundEnabled = !isSoundEnabled
-                navigatorRef[0]?.setAudioGuidance(
-                    if (isSoundEnabled) {
-                        Navigator.AudioGuidance.SILENT
-                    } else {
-                        Navigator.AudioGuidance.VOICE_ALERTS_AND_GUIDANCE
-                    }
-                )
+                val soundEnabled = !isSoundEnabled
+                isSoundEnabled = soundEnabled
+                navigatorRef[0]?.applyAudioGuidance(soundEnabled)
             },
             onStop = {
                 navigatorRef[0]?.stopGuidance()
@@ -209,7 +205,8 @@ private fun startEmbeddedGuidance(
     navigator: Navigator,
     destinationName: String,
     destinationLat: Double,
-    destinationLng: Double
+    destinationLng: Double,
+    isSoundEnabled: () -> Boolean
 ) {
     val destination = Waypoint.builder()
         .setLatLng(destinationLat, destinationLng)
@@ -224,9 +221,7 @@ private fun startEmbeddedGuidance(
         ListenableResultFuture.OnResultListener { routeStatus ->
             when (routeStatus) {
                 Navigator.RouteStatus.OK -> {
-                    navigator.setAudioGuidance(
-                        Navigator.AudioGuidance.VOICE_ALERTS_AND_GUIDANCE
-                    )
+                    navigator.applyAudioGuidance(isSoundEnabled())
 
                     if (BuildConfig.DEBUG) {
                         navigator.getSimulator()
@@ -260,6 +255,16 @@ private fun startEmbeddedGuidance(
                     ).show()
                 }
             }
+        }
+    )
+}
+
+private fun Navigator.applyAudioGuidance(isSoundEnabled: Boolean) {
+    setAudioGuidance(
+        if (isSoundEnabled) {
+            Navigator.AudioGuidance.VOICE_ALERTS_AND_GUIDANCE
+        } else {
+            Navigator.AudioGuidance.SILENT
         }
     )
 }
