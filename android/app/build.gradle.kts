@@ -22,7 +22,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Google Maps API Key from local.properties
         val localProperties = Properties().apply {
             val localPropsFile = rootProject.file("local.properties")
             if (localPropsFile.exists()) {
@@ -30,10 +29,17 @@ android {
             }
         }
         val mapsApiKey = localProperties.getProperty("google_maps_api_key", "")
+        val googleWebClientId = localProperties.getProperty("google_web_client_id", "")
 
-        buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"${localProperties.getProperty("google_maps_api_key", "")}\"")
+        buildConfigField(
+            "String",
+            "GOOGLE_MAPS_API_KEY",
+            "\"${localProperties.getProperty("google_maps_api_key", "")}\""
+        )
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
 
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
+        resValue("string", "google_web_client_id", googleWebClientId)
     }
 
     buildTypes {
@@ -53,6 +59,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 }
 
@@ -92,9 +99,10 @@ dependencies {
     // Google Navigation SDK bundles the Maps SDK classes used by the existing map preview.
     implementation("com.google.android.libraries.navigation:navigation:7.5.0")
 
-    // Google Maps
+    // Google services
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     //Places api
     implementation("com.google.android.libraries.places:places:4.3.1")

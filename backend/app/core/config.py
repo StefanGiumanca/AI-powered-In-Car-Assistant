@@ -15,6 +15,7 @@ class Settings(BaseModel):
     access_token_expire_hours: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_HOURS", "24")
     )
+    google_oauth_client_id: str | None = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 
 
 settings = Settings()

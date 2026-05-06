@@ -1,5 +1,6 @@
 import asyncio
 import unittest
+from unittest.mock import patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -115,6 +116,83 @@ class AuthEndpointTest(unittest.TestCase):
 
         self.assertEqual(status, 401)
         self.assertEqual(body["detail"], "Incorrect email or password.")
+
+    def test_google_login_creates_user_and_returns_bearer_token(self) -> None:
+        token_info = {
+            "sub": "google-user-123",
+            "email": "google@test.com",
+            "email_verified": True,
+            "name": "Google User",
+        }
+
+        with patch(
+            "app.services.auth_service.verify_google_id_token",
+            return_value=token_info,
+        ):
+            status, body = asyncio.run(
+                request_app("POST", "/auth/google", {"id_token": "valid-token"})
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["token_type"], "bearer")
+        self.assertTrue(body["access_token"])
+        self.assertEqual(body["user"]["email"], "google@test.com")
+        self.assertEqual(body["user"]["full_name"], "Google User")
+
+        db = self.SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == "google@test.com").one()
+            self.assertIsNone(user.password_hash)
+            self.assertEqual(user.oauth_provider, "google")
+            self.assertEqual(user.oauth_subject, "google-user-123")
+        finally:
+            db.close()
+
+    def test_google_login_links_existing_email_user(self) -> None:
+        asyncio.run(request_app("POST", "/auth/register", REGISTER_PAYLOAD))
+        token_info = {
+            "sub": "google-user-456",
+            "email": "demo@test.com",
+            "email_verified": True,
+            "name": "Demo User",
+        }
+
+        with patch(
+            "app.services.auth_service.verify_google_id_token",
+            return_value=token_info,
+        ):
+            status, body = asyncio.run(
+                request_app("POST", "/auth/google", {"id_token": "valid-token"})
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["user"]["email"], "demo@test.com")
+
+        db = self.SessionLocal()
+        try:
+            user = db.query(User).filter(User.email == "demo@test.com").one()
+            self.assertEqual(user.oauth_provider, "google")
+            self.assertEqual(user.oauth_subject, "google-user-456")
+            self.assertTrue(verify_password("test1234", user.password_hash))
+        finally:
+            db.close()
+
+    def test_google_login_invalid_token_returns_401(self) -> None:
+        from fastapi import HTTPException, status
+
+        with patch(
+            "app.services.auth_service.verify_google_id_token",
+            side_effect=HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Google token.",
+            ),
+        ):
+            status_code, body = asyncio.run(
+                request_app("POST", "/auth/google", {"id_token": "invalid-token"})
+            )
+
+        self.assertEqual(status_code, 401)
+        self.assertEqual(body["detail"], "Invalid Google token.")
 
     def test_me_success_returns_current_user(self) -> None:
         asyncio.run(request_app("POST", "/auth/register", REGISTER_PAYLOAD))
