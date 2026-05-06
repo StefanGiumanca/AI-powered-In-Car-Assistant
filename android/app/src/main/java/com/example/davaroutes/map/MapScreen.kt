@@ -82,6 +82,7 @@ fun MapScreen(
     var durationMinutes by remember { mutableStateOf<Double?>(null) }
 
     var isDarkMap by remember { mutableStateOf(false) }
+    var isNavigationMode by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState()
 
@@ -173,6 +174,24 @@ fun MapScreen(
             .fillMaxSize()
             .background(DarkNavy)
     ) {
+        if (isNavigationMode && destinationLocation != null) {
+            val destination = destinationLocation
+
+            EmbeddedNavigationScreen(
+                activity = activity,
+                destinationName = destinationName,
+                destinationLat = destination!!.latitude,
+                destinationLng = destination.longitude,
+                distanceKm = distanceKm,
+                durationMinutes = durationMinutes,
+                onExitNavigation = {
+                    isNavigationMode = false
+                    showRoutePreview = true
+                }
+            )
+            return@Box
+        }
+
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
@@ -287,11 +306,18 @@ fun MapScreen(
                     showRouteForm = true
                 },
                 onStartTripClick = {
-                    Toast.makeText(
-                        activity,
-                        "Trip start va fi legat de endpoint-ul dedicat",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    val destination = destinationLocation
+
+                    if (destination == null) {
+                        Toast.makeText(
+                            activity,
+                            "Destinatia lipseste",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@RoutePreviewActionsCard
+                    }
+
+                    isNavigationMode = true
                 },
                 onCancelClick = {
                     clearDestination()

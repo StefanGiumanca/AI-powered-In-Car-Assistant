@@ -46,12 +46,23 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-maps")
+
+    resolutionStrategy {
+        force("org.chromium.net:cronet-api:143.7445.0")
+        force("org.chromium.net:cronet-common:143.7445.0")
+        force("org.chromium.net:cronet-fallback:143.7445.0")
     }
 }
 
@@ -78,9 +89,11 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 
+    // Google Navigation SDK bundles the Maps SDK classes used by the existing map preview.
+    implementation("com.google.android.libraries.navigation:navigation:7.5.0")
+
     // Google Maps
     implementation("com.google.maps.android:maps-compose:4.3.3")
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
     //Places api
@@ -93,4 +106,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
     implementation("com.google.maps.android:android-maps-utils:3.8.2")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.0.3")
 }

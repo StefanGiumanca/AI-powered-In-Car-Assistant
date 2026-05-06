@@ -16,6 +16,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DavaRoutes"
         android:usesCleartextTraffic="true">
+        <service
+            android:name=".map.NavInfoReceivingService"
+            android:exported="false" />
+
         <activity
             android:name=".UserDashboard"
             android:exported="false"
@@ -26,7 +30,6 @@
             android:exported="false"
             android:label="Add Car"
             android:theme="@style/Theme.DavaRoutes" />
-
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${GOOGLE_MAPS_API_KEY}" />
