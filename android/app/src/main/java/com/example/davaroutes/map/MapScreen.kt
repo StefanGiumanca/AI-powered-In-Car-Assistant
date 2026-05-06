@@ -314,6 +314,21 @@ fun MapScreen(
             if (!result.isNullOrBlank()) return result
         }
 
+        val fallbackDestination = text
+            .replace(
+                Regex("""\b\d+\s*(km|kilometri|kilometrii|kilometru|autonomie)?\b""", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .replace(
+                Regex("""\b(am|cu|autonomie|range)\b""", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .trim(' ', ',', '.', ';', ':')
+
+        if (fallbackDestination.isNotBlank()) {
+            return fallbackDestination
+        }
+
         return ""
     }
 
@@ -639,7 +654,9 @@ fun MapScreen(
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (!granted) {
+        if (granted) {
+            startVoiceInput()
+        } else {
             Toast.makeText(
                 activity,
                 "Permisiunea pentru microfon nu a fost acordată",
