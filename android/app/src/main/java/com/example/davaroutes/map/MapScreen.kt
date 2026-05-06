@@ -54,6 +54,8 @@ import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
+import com.google.android.libraries.places.widget.Autocomplete
+import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
@@ -82,12 +84,14 @@ fun MapScreen(
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     var destinationLocation by remember { mutableStateOf<LatLng?>(null) }
     var destinationName by remember { mutableStateOf("") }
+    var destinationAddress by remember { mutableStateOf("") }
     var permissionGranted by remember { mutableStateOf(false) }
 
     var showRouteForm by remember { mutableStateOf(false) }
     var currentRange by remember { mutableStateOf("") }
     var routePreferences by remember { mutableStateOf("") }
     var showRoutePreview by remember { mutableStateOf(false) }
+    var isRoutePreviewExpanded by remember { mutableStateOf(false) }
 
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var isLoadingRoute by remember { mutableStateOf(false) }
@@ -100,6 +104,7 @@ fun MapScreen(
     var isLoadingPredictions by remember { mutableStateOf(false) }
 
     var isDarkMap by remember { mutableStateOf(false) }
+    var isNavigationMode by remember { mutableStateOf(false) }
 
     var isListening by remember { mutableStateOf(false) }
     var recognizedSpeech by remember { mutableStateOf("") }
@@ -155,6 +160,7 @@ fun MapScreen(
     fun clearDestination() {
         destinationLocation = null
         destinationName = ""
+        destinationAddress = ""
         pendingVoiceDestination = ""
         pendingVoiceNeedsRange = false
         routePoints = emptyList()
@@ -164,6 +170,7 @@ fun MapScreen(
         showRoutePreview = false
         currentRange = ""
         routePreferences = ""
+        isRoutePreviewExpanded = false
 
         userLocation?.let { location ->
             activity.lifecycleScope.launch {
@@ -305,6 +312,21 @@ fun MapScreen(
                 ?.trim()
 
             if (!result.isNullOrBlank()) return result
+        }
+
+        val fallbackDestination = text
+            .replace(
+                Regex("""\b\d+\s*(km|kilometri|kilometrii|kilometru|autonomie)?\b""", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .replace(
+                Regex("""\b(am|cu|autonomie|range)\b""", RegexOption.IGNORE_CASE),
+                ""
+            )
+            .trim(' ', ',', '.', ';', ':')
+
+        if (fallbackDestination.isNotBlank()) {
+            return fallbackDestination
         }
 
         return ""
@@ -632,7 +654,9 @@ fun MapScreen(
     val audioPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (!granted) {
+        if (granted) {
+            startVoiceInput()
+        } else {
             Toast.makeText(
                 activity,
                 "Permisiunea pentru microfon nu a fost acordată",
@@ -722,14 +746,14 @@ fun MapScreen(
                 }
 
                 destinationLocation = latLng
-                destinationName = place.name
-                    ?: place.address
-                            ?: prediction.primaryText
+                destinationName = place.name ?: place.address ?: prediction.primaryText
+                destinationAddress = place.address ?: ""
 
                 routePoints = emptyList()
                 distanceKm = null
                 durationMinutes = null
                 showRoutePreview = false
+                isRoutePreviewExpanded = false
                 showRouteForm = false
 
                 showDestinationSearch = false
@@ -750,6 +774,33 @@ fun MapScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             }
+    }
+
+    val placesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            val place = Autocomplete.getPlaceFromIntent(result.data!!)
+            val latLng = place.latLng
+
+            if (latLng != null) {
+                destinationLocation = latLng
+                destinationName = place.name ?: place.address ?: "Selected destination"
+                destinationAddress = place.address ?: ""
+
+                routePoints = emptyList()
+                distanceKm = null
+                durationMinutes = null
+                showRoutePreview = false
+                isRoutePreviewExpanded = false
+
+                activity.lifecycleScope.launch {
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngZoom(latLng, 15f)
+                    )
+                }
+            }
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -795,6 +846,25 @@ fun MapScreen(
             .fillMaxSize()
             .background(DarkNavy)
     ) {
+        if (isNavigationMode && destinationLocation != null) {
+            val destination = destinationLocation
+
+            EmbeddedNavigationScreen(
+                activity = activity,
+                destinationName = destinationName,
+                destinationAddress = destinationAddress,
+                destinationLat = destination!!.latitude,
+                destinationLng = destination.longitude,
+                distanceKm = distanceKm,
+                durationMinutes = durationMinutes,
+                onExitNavigation = {
+                    isNavigationMode = false
+                    showRoutePreview = true
+                }
+            )
+            return@Box
+        }
+
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
@@ -829,24 +899,10 @@ fun MapScreen(
             }
         }
 
-        SearchDestinationCard(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 56.dp, start = 16.dp, end = 78.dp)
-                .fillMaxWidth(),
-            destinationName = destinationName,
-            onSearchClick = {
-                showDestinationSearch = true
-                destinationQuery = ""
-                destinationPredictions = emptyList()
-                autocompleteSessionToken = AutocompleteSessionToken.newInstance()
-            }
-        )
-
         FloatingActionButton(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 56.dp, end = 16.dp)
+                .align(Alignment.TopStart)
+                .padding(top = 56.dp, start = 16.dp)
                 .size(52.dp),
             containerColor = Orange,
             contentColor = Color.White,
@@ -870,7 +926,7 @@ fun MapScreen(
             RouteSummaryCard(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                     .fillMaxWidth(),
                 destinationName = destinationName,
                 distanceKm = distanceKm,
@@ -896,15 +952,26 @@ fun MapScreen(
                 durationMinutes = durationMinutes,
                 currentRange = currentRange,
                 routePreferences = routePreferences,
+                isExpanded = isRoutePreviewExpanded,
+                onToggleExpanded = {
+                    isRoutePreviewExpanded = !isRoutePreviewExpanded
+                },
                 onChangeDetailsClick = {
                     showRouteForm = true
                 },
                 onStartTripClick = {
-                    Toast.makeText(
-                        activity,
-                        "Trip start va fi legat de endpoint-ul dedicat",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    val destination = destinationLocation
+
+                    if (destination == null) {
+                        Toast.makeText(
+                            activity,
+                            "Destinatia lipseste",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@RoutePreviewActionsCard
+                    }
+
+                    isNavigationMode = true
                 },
                 onCancelClick = {
                     clearDestination()
@@ -912,10 +979,10 @@ fun MapScreen(
             )
         }
 
-        if (!showRoutePreview) {
+        if (!showRoutePreview && destinationLocation == null) {
             FloatingActionButton(
                 modifier = Modifier
-                    .padding(start = 16.dp, bottom = 16.dp)
+                    .padding(start = 16.dp, bottom = 158.dp)
                     .align(Alignment.BottomStart),
                 containerColor = Orange,
                 contentColor = Color.White,
@@ -938,39 +1005,49 @@ fun MapScreen(
             }
         }
 
-        FloatingActionButton(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-                .size(62.dp),
-            containerColor = if (isListening) Color(0xFFB23A48) else Orange,
-            contentColor = Color.White,
-            onClick = {
-                requestOrStartVoiceInput()
+        if (!showRoutePreview && destinationLocation == null) {
+            FloatingActionButton(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 16.dp,
+                        bottom = 158.dp
+                    )
+                    .size(52.dp),
+                containerColor = NavyCard,
+                contentColor = Orange,
+                onClick = {
+                    isDarkMap = !isDarkMap
+                }
+            ) {
+                Text(if (isDarkMap) "Light" else "Dark")
             }
-        ) {
-            Text(if (isListening) "●" else "🎤")
         }
 
-        FloatingActionButton(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = 16.dp,
-                    bottom = when {
-                        showRoutePreview -> 292.dp
-                        destinationLocation != null -> 260.dp
-                        else -> 16.dp
-                    }
-                )
-                .size(52.dp),
-            containerColor = NavyCard,
-            contentColor = Orange,
-            onClick = {
-                isDarkMap = !isDarkMap
-            }
-        ) {
-            Text(if (isDarkMap) "☀️" else "🌙")
+        if (destinationLocation == null) {
+            SearchDestinationCard(
+                modifier = Modifier
+                    .fillMaxSize(),
+                destinationName = destinationName,
+                onSearchClick = {
+                    val fields = listOf(
+                        Place.Field.ID,
+                        Place.Field.NAME,
+                        Place.Field.ADDRESS,
+                        Place.Field.LAT_LNG
+                    )
+
+                    val intent = Autocomplete.IntentBuilder(
+                        AutocompleteActivityMode.OVERLAY,
+                        fields
+                    ).build(activity)
+
+                    placesLauncher.launch(intent)
+                },
+                onVoiceClick = {
+                    requestOrStartVoiceInput()
+                },
+            )
         }
 
         if (recognizedSpeech.isNotBlank() && !showRoutePreview) {
