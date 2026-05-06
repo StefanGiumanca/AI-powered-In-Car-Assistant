@@ -1,5 +1,6 @@
 package com.example.davaroutes
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,6 +43,8 @@ import com.example.davaroutes.ui.theme.MutedText
 import com.example.davaroutes.ui.theme.NavyCard
 import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 class DriverProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,8 +120,33 @@ class DriverProfileActivity : ComponentActivity() {
                 ComingSoonRow("Preferred partners")
             }
 
+            Button(
+                onClick = { activity.logout() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB23A48))
+            ) {
+                Text("Log out", color = SoftWhite, fontWeight = FontWeight.Bold)
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    private fun logout() {
+        val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+
+        GoogleSignIn.getClient(this, googleSignInOptions).signOut()
+
+        val intent = Intent(this, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
     }
 }
 

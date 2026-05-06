@@ -43,6 +43,10 @@ class LoginRequest(APIModel):
         return value.lower()
 
 
+class GoogleLoginRequest(APIModel):
+    id_token: str = Field(..., min_length=1)
+
+
 class LoginResponse(APIModel):
     access_token: str = Field(..., min_length=1)
     token_type: Literal["bearer"] = "bearer"

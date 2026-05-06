@@ -1,4 +1,10 @@
-from .auth import AuthUserResponse, LoginRequest, LoginResponse, RegisterRequest
+from .auth import (
+    AuthUserResponse,
+    GoogleLoginRequest,
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+)
 from .bootstrap import BootstrapResponse
 from .common import (
     APIModel,
@@ -45,6 +51,7 @@ __all__ = [
     "DriverProfileDTO",
     "DriverProfileResponse",
     "HealthResponse",
+    "GoogleLoginRequest",
     "IdentifiedLocationDTO",
     "LabeledLocationDTO",
     "LoginRequest",

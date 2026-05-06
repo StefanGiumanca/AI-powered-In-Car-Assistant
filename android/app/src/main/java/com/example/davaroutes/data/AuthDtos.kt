@@ -5,6 +5,10 @@ data class LoginRequest(
     val password: String
 )
 
+data class GoogleLoginRequest(
+    val id_token: String
+)
+
 data class LoginResponse(
     val access_token: String,
     val token_type: String,

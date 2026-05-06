@@ -2,6 +2,7 @@ package com.example.davaroutes.network
 
 import com.example.davaroutes.data.LoginRequest
 import com.example.davaroutes.data.LoginResponse
+import com.example.davaroutes.data.GoogleLoginRequest
 import com.example.davaroutes.data.RegisterRequest
 import com.example.davaroutes.data.RegisterResponse
 import com.example.davaroutes.data.BootstrapResponse
@@ -23,6 +24,11 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(
         @Body request: LoginRequest
+    ): Response<LoginResponse>
+
+    @POST("auth/google")
+    suspend fun googleLogin(
+        @Body request: GoogleLoginRequest
     ): Response<LoginResponse>
 
     @POST("auth/register")

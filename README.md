@@ -4,6 +4,11 @@
 - be in the root of the project
 - docker-compose up --build
 
+## Google OAuth setup
+- backend `.env`: add `GOOGLE_OAUTH_CLIENT_ID=<your-web-oauth-client-id>`
+- android `local.properties`: add `google_web_client_id=<your-web-oauth-client-id>`
+- the Android OAuth client in Google Cloud must use package `com.example.davaroutes` and the SHA-1 fingerprint for the keystore you are running with
+
 ## Inserting sample data
 - be in the root of the project
 - docker compose exec backend python -m app.db.seed
