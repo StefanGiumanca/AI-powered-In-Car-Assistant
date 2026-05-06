@@ -69,12 +69,14 @@ fun MapScreen(
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     var destinationLocation by remember { mutableStateOf<LatLng?>(null) }
     var destinationName by remember { mutableStateOf("") }
+    var destinationAddress by remember { mutableStateOf("") }
     var permissionGranted by remember { mutableStateOf(false) }
 
     var showRouteForm by remember { mutableStateOf(false) }
     var currentRange by remember { mutableStateOf("") }
     var routePreferences by remember { mutableStateOf("") }
     var showRoutePreview by remember { mutableStateOf(false) }
+    var isRoutePreviewExpanded by remember { mutableStateOf(false) }
 
     var routePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var isLoadingRoute by remember { mutableStateOf(false) }
@@ -89,6 +91,7 @@ fun MapScreen(
     fun clearDestination() {
         destinationLocation = null
         destinationName = ""
+        destinationAddress = ""
         routePoints = emptyList()
         distanceKm = null
         durationMinutes = null
@@ -96,6 +99,7 @@ fun MapScreen(
         showRoutePreview = false
         currentRange = ""
         routePreferences = ""
+        isRoutePreviewExpanded = false
 
         userLocation?.let { location ->
             activity.lifecycleScope.launch {
@@ -116,11 +120,13 @@ fun MapScreen(
             if (latLng != null) {
                 destinationLocation = latLng
                 destinationName = place.name ?: place.address ?: "Selected destination"
+                destinationAddress = place.address ?: ""
 
                 routePoints = emptyList()
                 distanceKm = null
                 durationMinutes = null
                 showRoutePreview = false
+                isRoutePreviewExpanded = false
 
                 activity.lifecycleScope.launch {
                     cameraPositionState.animate(
@@ -180,6 +186,7 @@ fun MapScreen(
             EmbeddedNavigationScreen(
                 activity = activity,
                 destinationName = destinationName,
+                destinationAddress = destinationAddress,
                 destinationLat = destination!!.latitude,
                 destinationLng = destination.longitude,
                 distanceKm = distanceKm,
@@ -302,6 +309,10 @@ fun MapScreen(
                 durationMinutes = durationMinutes,
                 currentRange = currentRange,
                 routePreferences = routePreferences,
+                isExpanded = isRoutePreviewExpanded,
+                onToggleExpanded = {
+                    isRoutePreviewExpanded = !isRoutePreviewExpanded
+                },
                 onChangeDetailsClick = {
                     showRouteForm = true
                 },
@@ -351,25 +362,23 @@ fun MapScreen(
             }
         }
 
-        FloatingActionButton(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = 16.dp,
-                    bottom = when {
-                        showRoutePreview -> 292.dp
-                        destinationLocation != null -> 260.dp
-                        else -> 16.dp
-                    }
-                )
-                .size(52.dp),
-            containerColor = NavyCard,
-            contentColor = Orange,
-            onClick = {
-                isDarkMap = !isDarkMap
+        if (!showRoutePreview) {
+            FloatingActionButton(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 16.dp,
+                        bottom = if (destinationLocation != null) 260.dp else 16.dp
+                    )
+                    .size(52.dp),
+                containerColor = NavyCard,
+                contentColor = Orange,
+                onClick = {
+                    isDarkMap = !isDarkMap
+                }
+            ) {
+                Text(if (isDarkMap) "☀️" else "🌙")
             }
-        ) {
-            Text(if (isDarkMap) "☀️" else "🌙")
         }
 
         if (showRouteForm && destinationLocation != null) {
@@ -441,6 +450,7 @@ fun MapScreen(
 
                                     showRouteForm = false
                                     showRoutePreview = true
+                                    isRoutePreviewExpanded = false
 
                                     Toast.makeText(
                                         activity,

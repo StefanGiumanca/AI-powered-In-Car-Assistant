@@ -1,17 +1,28 @@
 package com.example.davaroutes.map
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,6 +39,8 @@ import com.example.davaroutes.ui.theme.MutedText
 import com.example.davaroutes.ui.theme.NavyCard
 import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SearchDestinationCard(
@@ -162,13 +175,15 @@ fun RoutePreviewActionsCard(
     durationMinutes: Double?,
     currentRange: String,
     routePreferences: String,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onChangeDetailsClick: () -> Unit,
     onStartTripClick: () -> Unit,
     onCancelClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.animateContentSize(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = NavyCard.copy(alpha = 0.96f))
     ) {
@@ -176,73 +191,117 @@ fun RoutePreviewActionsCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Route preview",
-                color = Orange,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Text(
-                text = destinationName,
-                color = SoftWhite,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            distanceKm?.let {
-                RouteInfoRow("Distance", "%.2f km".format(it))
-            }
-
-            durationMinutes?.let {
-                RouteInfoRow("Duration", "%.0f minutes".format(it))
-            }
-
-            if (currentRange.isNotBlank()) {
-                RouteInfoRow("Range", currentRange)
-            }
-
-            if (routePreferences.isNotBlank()) {
-                Text(
-                    text = routePreferences,
-                    color = MutedText,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
-                OutlinedButton(
+                Column(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Orange),
-                    onClick = onChangeDetailsClick
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Details")
+                    Text(
+                        text = destinationName,
+                        color = SoftWhite,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Text(
+                        text = formatPreviewEta(durationMinutes),
+                        color = Orange,
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
                 }
 
-                Button(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Orange,
-                        contentColor = Color.White
-                    ),
-                    onClick = onStartTripClick
-                ) {
-                    Text("Start trip", fontWeight = FontWeight.Bold)
+                IconButton(onClick = onToggleExpanded) {
+                    Icon(
+                        imageVector = if (isExpanded) {
+                            Icons.Filled.KeyboardArrowDown
+                        } else {
+                            Icons.Filled.KeyboardArrowUp
+                        },
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = Orange
+                    )
                 }
             }
 
-            TextButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onCancelClick
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
             ) {
-                Text("Cancel", color = Orange, fontWeight = FontWeight.Bold)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    distanceKm?.let {
+                        RouteInfoRow("Distance", "%.2f km".format(it))
+                    }
+
+                    durationMinutes?.let {
+                        RouteInfoRow("Duration", "%.0f minutes".format(it))
+                    }
+
+                    if (currentRange.isNotBlank()) {
+                        RouteInfoRow("Range", currentRange)
+                    }
+
+                    if (routePreferences.isNotBlank()) {
+                        Text(
+                            text = routePreferences,
+                            color = MutedText,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Orange),
+                            onClick = onChangeDetailsClick
+                        ) {
+                            Text("Details")
+                        }
+
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Orange,
+                                contentColor = Color.White
+                            ),
+                            onClick = onStartTripClick
+                        ) {
+                            Text("Start trip", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onCancelClick
+                    ) {
+                        Text("Cancel", color = Orange, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
+}
+
+private fun formatPreviewEta(durationMinutes: Double?): String {
+    if (durationMinutes == null) {
+        return "ETA --:--"
+    }
+
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+    val arrivalTime = LocalTime.now().plusMinutes(durationMinutes.toLong())
+    return "ETA ${arrivalTime.format(formatter)}"
 }
 
 @Composable

@@ -2,25 +2,36 @@ package com.example.davaroutes.map
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -29,6 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import com.example.davaroutes.BuildConfig
 import com.example.davaroutes.MainActivity
 import com.example.davaroutes.ui.theme.MutedText
@@ -45,11 +63,14 @@ import com.google.android.libraries.navigation.Navigator
 import com.google.android.libraries.navigation.RoutingOptions
 import com.google.android.libraries.navigation.SimulationOptions
 import com.google.android.libraries.navigation.Waypoint
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun EmbeddedNavigationScreen(
     activity: MainActivity,
     destinationName: String,
+    destinationAddress: String,
     destinationLat: Double,
     destinationLng: Double,
     distanceKm: Double?,
@@ -60,6 +81,9 @@ fun EmbeddedNavigationScreen(
     val navigationView = remember { NavigationView(activity) }
     val navigatorRef = remember { arrayOfNulls<Navigator>(1) }
     val instruction by NavigationInstructionStore.instruction.collectAsState()
+    var isSoundEnabled by remember { mutableStateOf(true) }
+    var isNavigationCardExpanded by remember { mutableStateOf(false) }
+    val compactNavigationCardHeight = 112.dp
 
     DisposableEffect(destinationLat, destinationLng) {
         navigationView.onCreate(Bundle())
@@ -131,7 +155,9 @@ fun EmbeddedNavigationScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = compactNavigationCardHeight),
             factory = { navigationView }
         )
 
@@ -140,6 +166,39 @@ fun EmbeddedNavigationScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                .fillMaxWidth()
+        )
+
+        NavigationBottomCard(
+            destinationName = destinationName,
+            destinationAddress = destinationAddress,
+            distanceKm = distanceKm,
+            durationMinutes = durationMinutes,
+            isExpanded = isNavigationCardExpanded,
+            isSoundEnabled = isSoundEnabled,
+            onToggleExpanded = {
+                isNavigationCardExpanded = !isNavigationCardExpanded
+            },
+            onToggleSound = {
+                isSoundEnabled = !isSoundEnabled
+                navigatorRef[0]?.setAudioGuidance(
+                    if (isSoundEnabled) {
+                        Navigator.AudioGuidance.SILENT
+                    } else {
+                        Navigator.AudioGuidance.VOICE_ALERTS_AND_GUIDANCE
+                    }
+                )
+            },
+            onStop = {
+                navigatorRef[0]?.stopGuidance()
+                onExitNavigation()
+            },
+            onResume = {
+                navigatorRef[0]?.startGuidance()
+                isNavigationCardExpanded = false
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
         )
     }
@@ -264,6 +323,143 @@ private fun NavigationInstructionHeader(
     }
 }
 
+@Composable
+private fun NavigationBottomCard(
+    destinationName: String,
+    destinationAddress: String,
+    distanceKm: Double?,
+    durationMinutes: Double?,
+    isExpanded: Boolean,
+    isSoundEnabled: Boolean,
+    onToggleExpanded: () -> Unit,
+    onToggleSound: () -> Unit,
+    onStop: () -> Unit,
+    onResume: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.animateContentSize(),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+        colors = CardDefaults.cardColors(containerColor = NavyCard.copy(alpha = 0.97f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleExpanded),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier = Modifier.width(42.dp))
+
+                Text(
+                    modifier = Modifier.weight(1f),
+                    text = formatEta(durationMinutes),
+                    color = SoftWhite,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                IconButton(onClick = onToggleSound) {
+                    Icon(
+                        imageVector = if (isSoundEnabled) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                        contentDescription = if (isSoundEnabled) "Sound on" else "Sound off",
+                        tint = Orange
+                    )
+                }
+
+                IconButton(onClick = onToggleExpanded) {
+                    Icon(
+                        imageVector = if (isExpanded) {
+                            Icons.Filled.KeyboardArrowDown
+                        } else {
+                            Icons.Filled.KeyboardArrowUp
+                        },
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = MutedText
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatRemainingTime(durationMinutes),
+                    color = MutedText,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    text = "|",
+                    color = MutedText
+                )
+
+                Text(
+                    text = formatRemainingDistance(distanceKm),
+                    color = SoftWhite,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = formatDestinationLabel(destinationName, destinationAddress),
+                        color = SoftWhite,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Orange),
+                            onClick = onStop
+                        ) {
+                            Text("Stop", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Orange,
+                                contentColor = Color.White
+                            ),
+                            onClick = onResume
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Resume", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun formatStepDistance(distanceMeters: Int?): String {
     if (distanceMeters == null) {
         return "Continue"
@@ -274,6 +470,50 @@ private fun formatStepDistance(distanceMeters: Int?): String {
     } else {
         "In %.1f km".format(distanceMeters / 1000.0)
     }
+}
+
+private fun formatEta(durationMinutes: Double?): String {
+    if (durationMinutes == null) {
+        return "ETA --:--"
+    }
+
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+    val arrivalTime = LocalTime.now().plusMinutes(durationMinutes.toLong())
+    return "ETA ${arrivalTime.format(formatter)}"
+}
+
+private fun formatRemainingTime(durationMinutes: Double?): String {
+    if (durationMinutes == null) {
+        return "-- min"
+    }
+
+    return "%.0f min".format(durationMinutes)
+}
+
+private fun formatRemainingDistance(distanceKm: Double?): String {
+    if (distanceKm == null) {
+        return "-- km"
+    }
+
+    return "%.1f km".format(distanceKm)
+}
+
+private fun formatDestinationLabel(
+    destinationName: String,
+    destinationAddress: String
+): String {
+    val name = destinationName.trim()
+    val address = destinationAddress.trim()
+
+    if (name.isBlank()) {
+        return address.ifBlank { "Selected destination" }
+    }
+
+    if (address.isBlank() || name.equals(address, ignoreCase = true)) {
+        return name
+    }
+
+    return "$name\n$address"
 }
 
 private fun maneuverLabel(maneuver: Int): String =
