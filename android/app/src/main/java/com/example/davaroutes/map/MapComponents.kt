@@ -59,11 +59,14 @@ import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @Composable
 fun SearchDestinationCard(
     destinationName: String,
     onSearchClick: () -> Unit,
+    onVoiceClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -152,7 +155,7 @@ fun SearchDestinationCard(
                             style = MaterialTheme.typography.bodyLarge
                         )
 
-                        IconButton(onClick = onSearchClick) {
+                        IconButton(onClick = onVoiceClick) {
                             Icon(
                                 imageVector = Icons.Filled.Mic,
                                 contentDescription = "Voice search",
@@ -530,6 +533,98 @@ fun RouteDetailsDialog(
                 enabled = !isLoadingRoute,
                 onClick = onDismiss
             ) {
+                Text("Cancel", color = Orange)
+            }
+        }
+    )
+}
+
+@Composable
+fun DestinationSearchDialog(
+    query: String,
+    predictions: List<PlacePredictionUi>,
+    isLoading: Boolean,
+    onQueryChange: (String) -> Unit,
+    onPredictionClick: (PlacePredictionUi) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NavyCard,
+        titleContentColor = SoftWhite,
+        textContentColor = SoftWhite,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text("Search destination", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    label = { Text("Destination") },
+                    placeholder = { Text("Ex: Brasov, AFI Cotroceni") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SoftWhite,
+                        unfocusedTextColor = SoftWhite,
+                        cursorColor = Orange,
+                        focusedBorderColor = Orange,
+                        unfocusedBorderColor = Color(0xFF35566B),
+                        focusedLabelColor = Orange,
+                        unfocusedLabelColor = MutedText,
+                        focusedPlaceholderColor = MutedText,
+                        unfocusedPlaceholderColor = MutedText
+                    )
+                )
+
+                if (isLoading) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Orange
+                    )
+                }
+
+                LazyColumn(
+                    modifier = Modifier.height(260.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(predictions) { prediction ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPredictionClick(prediction) },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF243D50)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = prediction.primaryText,
+                                    color = SoftWhite,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (prediction.secondaryText.isNotBlank()) {
+                                    Text(
+                                        text = prediction.secondaryText,
+                                        color = MutedText,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel", color = Orange)
             }
         }
