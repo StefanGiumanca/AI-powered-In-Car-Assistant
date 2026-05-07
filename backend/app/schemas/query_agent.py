@@ -42,8 +42,24 @@ class RecommendationCandidateResponse(BaseModel):
     matches_requested_brand: bool
 
 
+class PlaceSearchIntentResponse(BaseModel):
+    primary_query: str
+    provider_types: list[str]
+    strong_positive_signals: list[str]
+    positive_signals: list[str]
+    negative_signals: list[str]
+    excluded_types: list[str]
+    strictness: str
+    open_now_required: bool
+    search_strategy: str
+    requires_specific_match: bool
+
+
 class RecommendationQueryResponse(BaseModel):
     interpretation: QueryInterpretation
+    place_intent: PlaceSearchIntentResponse | None = None
+    requested_brand: str | None = None
+    search_text_queries: list[str] = []
     radius_meters: int
     strict_match_found: bool
     message: str
