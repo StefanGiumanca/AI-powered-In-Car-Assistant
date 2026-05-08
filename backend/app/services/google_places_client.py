@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 import httpx
+from fastapi import HTTPException, status
 
 
 class GooglePlacesClient:
@@ -68,7 +69,7 @@ class GooglePlacesClient:
                 headers=self._headers(field_mask),
                 json=payload,
             )
-            response.raise_for_status()
+            raise_for_google_places_error(response)
             data = response.json()
 
         return data.get("places", [])
@@ -121,7 +122,7 @@ class GooglePlacesClient:
                 headers=self._headers(field_mask),
                 json=payload,
             )
-            response.raise_for_status()
+            raise_for_google_places_error(response)
             data = response.json()
 
         return data.get("places", [])
@@ -152,6 +153,20 @@ class GooglePlacesClient:
                 url,
                 headers=self._headers(field_mask),
             )
-            response.raise_for_status()
+            raise_for_google_places_error(response)
 
         return response.json()
+
+
+def raise_for_google_places_error(response: httpx.Response) -> None:
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "message": "Google Places API request failed.",
+                "status_code": response.status_code,
+                "response": response.text,
+            },
+        ) from exc
