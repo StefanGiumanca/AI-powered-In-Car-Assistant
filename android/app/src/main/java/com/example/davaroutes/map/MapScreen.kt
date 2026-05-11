@@ -68,6 +68,8 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Locale
 import java.util.UUID
 
@@ -85,6 +87,7 @@ fun MapScreen(
     var destinationLocation by remember { mutableStateOf<LatLng?>(null) }
     var destinationName by remember { mutableStateOf("") }
     var destinationAddress by remember { mutableStateOf("") }
+    var routeStops by remember { mutableStateOf<List<RouteStopUi>>(emptyList()) }
     var permissionGranted by remember { mutableStateOf(false) }
 
     var showRouteForm by remember { mutableStateOf(false) }
@@ -101,6 +104,11 @@ fun MapScreen(
     var destinationQuery by remember { mutableStateOf("") }
     var destinationPredictions by remember { mutableStateOf<List<PlacePredictionUi>>(emptyList()) }
     var isLoadingPredictions by remember { mutableStateOf(false) }
+    var recentPlaces by remember { mutableStateOf<List<RouteStopUi>>(emptyList()) }
+    var showStopSearchDialog by remember { mutableStateOf(false) }
+    var stopQuery by remember { mutableStateOf("") }
+    var stopPredictions by remember { mutableStateOf<List<PlacePredictionUi>>(emptyList()) }
+    var isLoadingStopPredictions by remember { mutableStateOf(false) }
 
     var isDarkMap by remember { mutableStateOf(false) }
     var isNavigationMode by remember { mutableStateOf(false) }
@@ -117,6 +125,9 @@ fun MapScreen(
 
     val cameraPositionState = rememberCameraPositionState()
     val context = LocalContext.current
+    val searchHistoryPrefs = remember {
+        context.getSharedPreferences("davaroutes_search_history", android.content.Context.MODE_PRIVATE)
+    }
 
     val placesClient = remember {
         com.google.android.libraries.places.api.Places.createClient(context)
@@ -127,6 +138,147 @@ fun MapScreen(
     }
 
     lateinit var startVoiceInput: () -> Unit
+
+    fun loadRecentPlaces(): List<RouteStopUi> {
+        val rawHistory = searchHistoryPrefs.getString("places", "[]").orEmpty()
+        val history = mutableListOf<RouteStopUi>()
+
+        try {
+            val jsonArray = JSONArray(rawHistory)
+            for (index in 0 until jsonArray.length()) {
+                val item = jsonArray.optJSONObject(index) ?: continue
+                history.add(
+                    RouteStopUi(
+                        name = item.optString("name"),
+                        address = item.optString("address"),
+                        lat = item.optDouble("lat"),
+                        lng = item.optDouble("lng")
+                    )
+                )
+            }
+        } catch (_: Exception) {
+            return emptyList()
+        }
+
+        return history
+            .filter { it.name.isNotBlank() && it.lat != 0.0 && it.lng != 0.0 }
+            .take(6)
+    }
+
+    fun saveRecentPlace(place: RouteStopUi) {
+        val updatedHistory = listOf(place)
+            .plus(
+                recentPlaces.filterNot {
+                    it.name == place.name &&
+                            it.lat == place.lat &&
+                            it.lng == place.lng
+                }
+            )
+            .take(6)
+
+        val jsonArray = JSONArray()
+        updatedHistory.forEach { item ->
+            jsonArray.put(
+                JSONObject()
+                    .put("name", item.name)
+                    .put("address", item.address)
+                    .put("lat", item.lat)
+                    .put("lng", item.lng)
+            )
+        }
+
+        searchHistoryPrefs.edit()
+            .putString("places", jsonArray.toString())
+            .apply()
+
+        recentPlaces = updatedHistory
+    }
+
+    fun saveNavigationHistory(
+        distanceKm: Double,
+        durationMinutes: Double
+    ) {
+        val rawHistory = searchHistoryPrefs.getString("routes", "[]").orEmpty()
+        val existingRoutes = mutableListOf<JSONObject>()
+
+        try {
+            val jsonArray = JSONArray(rawHistory)
+            for (index in 0 until jsonArray.length()) {
+                val item = jsonArray.optJSONObject(index) ?: continue
+                existingRoutes.add(item)
+            }
+        } catch (_: Exception) {
+            existingRoutes.clear()
+        }
+
+        val stopsJson = JSONArray()
+        routeStops.forEach { stop ->
+            stopsJson.put(
+                JSONObject()
+                    .put("name", stop.name)
+                    .put("address", stop.address)
+                    .put("lat", stop.lat)
+                    .put("lng", stop.lng)
+            )
+        }
+
+        val routeJson = JSONObject()
+            .put("destination_name", destinationName)
+            .put("destination_address", destinationAddress)
+            .put("destination_lat", destinationLocation?.latitude ?: 0.0)
+            .put("destination_lng", destinationLocation?.longitude ?: 0.0)
+            .put("distance_km", distanceKm)
+            .put("duration_minutes", durationMinutes)
+            .put("stops", stopsJson)
+            .put("created_at", System.currentTimeMillis())
+
+        val updatedRoutes = listOf(routeJson)
+            .plus(
+                existingRoutes.filterNot { item ->
+                    item.optString("destination_name") == destinationName &&
+                            item.optDouble("distance_km") == distanceKm &&
+                            item.optInt("duration_minutes") == durationMinutes.toInt()
+                }
+            )
+            .take(10)
+
+        val jsonArray = JSONArray()
+        updatedRoutes.forEach { jsonArray.put(it) }
+
+        searchHistoryPrefs.edit()
+            .putString("routes", jsonArray.toString())
+            .apply()
+    }
+
+    fun setDestinationFromPlace(place: RouteStopUi) {
+        val latLng = LatLng(place.lat, place.lng)
+
+        destinationLocation = latLng
+        destinationName = place.name
+        destinationAddress = place.address
+
+        routePoints = emptyList()
+        distanceKm = null
+        durationMinutes = null
+        showRoutePreview = false
+        isRoutePreviewExpanded = false
+        showRouteForm = false
+
+        destinationQuery = ""
+        destinationPredictions = emptyList()
+
+        saveRecentPlace(place)
+
+        activity.lifecycleScope.launch {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(latLng, 15f)
+            )
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        recentPlaces = loadRecentPlaces()
+    }
 
     DisposableEffect(Unit) {
         val tts = TextToSpeech(activity) { status ->
@@ -160,6 +312,7 @@ fun MapScreen(
         destinationLocation = null
         destinationName = ""
         destinationAddress = ""
+        routeStops = emptyList()
         pendingVoiceDestination = ""
         pendingVoiceNeedsRange = false
         routePoints = emptyList()
@@ -218,6 +371,13 @@ fun MapScreen(
                 lat = destination.latitude,
                 lng = destination.longitude
             ),
+            stops = routeStops.map { stop ->
+                RouteLocationDto(
+                    label = stop.name,
+                    lat = stop.lat,
+                    lng = stop.lng
+                )
+            },
             current_range = currentRange,
             route_preferences = routePreferences
         )
@@ -237,6 +397,10 @@ fun MapScreen(
                         routePoints = PolyUtil.decode(route.polyline)
                         distanceKm = route.distance_km
                         durationMinutes = route.duration_minutes
+                        saveNavigationHistory(
+                            distanceKm = route.distance_km,
+                            durationMinutes = route.duration_minutes
+                        )
 
                         showRouteForm = false
                         showRoutePreview = true
@@ -417,12 +581,22 @@ fun MapScreen(
                         destinationName = place.name
                             ?: place.address
                                     ?: destinationQueryFromVoice
+                        destinationAddress = place.address ?: ""
 
                         routePoints = emptyList()
                         distanceKm = null
                         durationMinutes = null
                         showRoutePreview = false
                         showRouteForm = false
+
+                        saveRecentPlace(
+                            RouteStopUi(
+                                name = destinationName,
+                                address = destinationAddress,
+                                lat = latLng.latitude,
+                                lng = latLng.longitude
+                            )
+                        )
 
                         activity.lifecycleScope.launch {
                             cameraPositionState.animate(
@@ -759,6 +933,15 @@ fun MapScreen(
                 destinationPredictions = emptyList()
                 autocompleteSessionToken = AutocompleteSessionToken.newInstance()
 
+                saveRecentPlace(
+                    RouteStopUi(
+                        name = destinationName,
+                        address = destinationAddress,
+                        lat = latLng.latitude,
+                        lng = latLng.longitude
+                    )
+                )
+
                 activity.lifecycleScope.launch {
                     cameraPositionState.animate(
                         CameraUpdateFactory.newLatLngZoom(latLng, 15f)
@@ -769,6 +952,104 @@ fun MapScreen(
                 Toast.makeText(
                     activity,
                     "Eroare la selectarea destinației: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+    }
+
+    fun searchStopPredictions(query: String) {
+        stopQuery = query
+
+        if (query.length < 2) {
+            stopPredictions = emptyList()
+            isLoadingStopPredictions = false
+            return
+        }
+
+        isLoadingStopPredictions = true
+
+        val request = FindAutocompletePredictionsRequest
+            .builder()
+            .setQuery(query)
+            .build()
+
+        placesClient.findAutocompletePredictions(request)
+            .addOnSuccessListener { response ->
+                stopPredictions = response.autocompletePredictions.map { prediction ->
+                    PlacePredictionUi(
+                        placeId = prediction.placeId,
+                        primaryText = prediction.getPrimaryText(null).toString(),
+                        secondaryText = prediction.getSecondaryText(null).toString()
+                    )
+                }
+                isLoadingStopPredictions = false
+            }
+            .addOnFailureListener { e ->
+                stopPredictions = emptyList()
+                isLoadingStopPredictions = false
+
+                Toast.makeText(
+                    activity,
+                    "Eroare la cautarea escalei: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+    }
+
+    fun selectStopPrediction(prediction: PlacePredictionUi) {
+        val fields = listOf(
+            Place.Field.ID,
+            Place.Field.NAME,
+            Place.Field.ADDRESS,
+            Place.Field.LAT_LNG
+        )
+
+        val request = FetchPlaceRequest
+            .builder(prediction.placeId, fields)
+            .build()
+
+        placesClient.fetchPlace(request)
+            .addOnSuccessListener { response ->
+                val place = response.place
+                val latLng = place.latLng
+
+                if (latLng == null) {
+                    Toast.makeText(
+                        activity,
+                        "Nu s-au putut obtine coordonatele escalei",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@addOnSuccessListener
+                }
+
+                val stop = RouteStopUi(
+                    name = place.name ?: place.address ?: prediction.primaryText,
+                    address = place.address ?: "",
+                    lat = latLng.latitude,
+                    lng = latLng.longitude
+                )
+
+                routeStops = routeStops
+                    .filterNot { it.lat == stop.lat && it.lng == stop.lng }
+                    .plus(stop)
+                    .take(8)
+
+                routePoints = emptyList()
+                distanceKm = null
+                durationMinutes = null
+                showRoutePreview = false
+                isRoutePreviewExpanded = false
+
+                stopQuery = ""
+                stopPredictions = emptyList()
+                showStopSearchDialog = false
+
+                saveRecentPlace(stop)
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(
+                    activity,
+                    "Eroare la selectarea escalei: ${e.message}",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -791,6 +1072,15 @@ fun MapScreen(
                 durationMinutes = null
                 showRoutePreview = false
                 isRoutePreviewExpanded = false
+
+                saveRecentPlace(
+                    RouteStopUi(
+                        name = destinationName,
+                        address = destinationAddress,
+                        lat = latLng.latitude,
+                        lng = latLng.longitude
+                    )
+                )
 
                 activity.lifecycleScope.launch {
                     cameraPositionState.animate(
@@ -888,6 +1178,13 @@ fun MapScreen(
                 )
             }
 
+            routeStops.forEachIndexed { index, stop ->
+                Marker(
+                    state = MarkerState(position = LatLng(stop.lat, stop.lng)),
+                    title = "${index + 1}. ${stop.name}"
+                )
+            }
+
             if (routePoints.isNotEmpty()) {
                 Polyline(
                     points = routePoints,
@@ -946,6 +1243,7 @@ fun MapScreen(
                     .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                     .fillMaxWidth(),
                 destinationName = destinationName,
+                stops = routeStops,
                 distanceKm = distanceKm,
                 durationMinutes = durationMinutes,
                 currentRange = currentRange,
@@ -1029,12 +1327,16 @@ fun MapScreen(
                 destinationName = destinationName,
                 query = destinationQuery,
                 predictions = destinationPredictions,
+                recentPlaces = recentPlaces,
                 isLoading = isLoadingPredictions,
                 onQueryChange = { query ->
                     searchDestinationPredictions(query)
                 },
                 onPredictionClick = { prediction ->
                     selectDestinationPrediction(prediction)
+                },
+                onRecentPlaceClick = { place ->
+                    setDestinationFromPlace(place)
                 },
                 onVoiceClick = {
                     requestOrStartVoiceInput()
@@ -1058,9 +1360,20 @@ fun MapScreen(
             RouteDetailsDialog(
                 currentRange = currentRange,
                 routePreferences = routePreferences,
+                stops = routeStops,
                 isLoadingRoute = isLoadingRoute,
                 onCurrentRangeChange = { currentRange = it },
                 onRoutePreferencesChange = { routePreferences = it },
+                onAddStopClick = {
+                    showStopSearchDialog = true
+                },
+                onRemoveStopClick = { stop ->
+                    routeStops = routeStops.filterNot { it == stop }
+                    routePoints = emptyList()
+                    distanceKm = null
+                    durationMinutes = null
+                    showRoutePreview = false
+                },
                 onDismiss = {
                     if (!isLoadingRoute) {
                         showRouteForm = false
@@ -1068,6 +1381,25 @@ fun MapScreen(
                 },
                 onConfirm = {
                     previewRoute()
+                }
+            )
+        }
+
+        if (showStopSearchDialog) {
+            DestinationSearchDialog(
+                query = stopQuery,
+                predictions = stopPredictions,
+                isLoading = isLoadingStopPredictions,
+                onQueryChange = { query ->
+                    searchStopPredictions(query)
+                },
+                onPredictionClick = { prediction ->
+                    selectStopPrediction(prediction)
+                },
+                onDismiss = {
+                    showStopSearchDialog = false
+                    stopQuery = ""
+                    stopPredictions = emptyList()
                 }
             )
         }

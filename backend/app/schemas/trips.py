@@ -16,6 +16,7 @@ class TripStartRequest(APIModel):
     driver_profile_id: str = Field(..., min_length=1, max_length=100)
     origin: LabeledLocationDTO
     destination: LabeledLocationDTO
+    stops: list[LabeledLocationDTO] = Field(default_factory=list, max_length=8)
     requested_mode: RequestedMode
 
 
@@ -24,6 +25,7 @@ class TripDTO(APIModel):
     status: TripStatus
     origin: LabeledLocationDTO
     destination: LabeledLocationDTO
+    stops: list[LabeledLocationDTO] = Field(default_factory=list)
     requested_mode: RequestedMode
 
 

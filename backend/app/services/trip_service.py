@@ -43,6 +43,13 @@ def start_trip(
         origin_lng=payload.origin.lng,
         dest_lat=payload.destination.lat,
         dest_lng=payload.destination.lng,
+        intermediates=[
+            {
+                "lat": stop.lat,
+                "lng": stop.lng,
+            }
+            for stop in payload.stops
+        ],
     )
 
     db_trip = dbm.Trip(
@@ -236,6 +243,7 @@ def build_trip_response(
                 lat=float(trip.destination_lat),
                 lng=float(trip.destination_lng),
             ),
+            stops=[],
             requested_mode=trip.requested_mode,
         ),
         route=RouteDTO(

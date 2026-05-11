@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
@@ -73,9 +75,11 @@ fun SearchDestinationCard(
     destinationName: String,
     query: String,
     predictions: List<PlacePredictionUi>,
+    recentPlaces: List<RouteStopUi>,
     isLoading: Boolean,
     onQueryChange: (String) -> Unit,
     onPredictionClick: (PlacePredictionUi) -> Unit,
+    onRecentPlaceClick: (RouteStopUi) -> Unit,
     onVoiceClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -239,7 +243,12 @@ fun SearchDestinationCard(
                         )
                     } else {
                         SearchHistoryContent(
-                            showEmptyState = sheetHeightPx > minHeightPx + with(density) { 44.dp.toPx() }
+                            recentPlaces = recentPlaces,
+                            showEmptyState = sheetHeightPx > minHeightPx + with(density) { 44.dp.toPx() },
+                            onRecentPlaceClick = {
+                                collapseSearch()
+                                onRecentPlaceClick(it)
+                            }
                         )
                     }
                 }
@@ -314,7 +323,9 @@ private fun SearchPredictionContent(
 
 @Composable
 private fun SearchHistoryContent(
-    showEmptyState: Boolean
+    recentPlaces: List<RouteStopUi>,
+    showEmptyState: Boolean,
+    onRecentPlaceClick: (RouteStopUi) -> Unit
 ) {
     AnimatedVisibility(
         visible = true,
@@ -332,12 +343,50 @@ private fun SearchHistoryContent(
                 style = MaterialTheme.typography.titleMedium
             )
 
-            if (showEmptyState) {
+            if (recentPlaces.isEmpty() && showEmptyState) {
                 Text(
                     text = "No recent searches",
                     color = MutedText,
                     style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(recentPlaces) { place ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onRecentPlaceClick(place) },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF243D50)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = place.name,
+                                color = SoftWhite,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            if (place.address.isNotBlank()) {
+                                Text(
+                                    text = place.address,
+                                    color = MutedText,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -434,6 +483,7 @@ fun RouteInfoRow(
 @Composable
 fun RoutePreviewActionsCard(
     destinationName: String,
+    stops: List<RouteStopUi>,
     distanceKm: Double?,
     durationMinutes: Double?,
     currentRange: String,
@@ -511,6 +561,25 @@ fun RoutePreviewActionsCard(
                         RouteInfoRow("Range", currentRange)
                     }
 
+                    if (stops.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Stops",
+                                color = Orange,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+
+                            stops.forEachIndexed { index, stop ->
+                                Text(
+                                    text = "${index + 1}. ${stop.name}",
+                                    color = MutedText,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+
                     if (routePreferences.isNotBlank()) {
                         Text(
                             text = routePreferences,
@@ -571,9 +640,12 @@ private fun formatPreviewEta(durationMinutes: Double?): String {
 fun RouteDetailsDialog(
     currentRange: String,
     routePreferences: String,
+    stops: List<RouteStopUi>,
     isLoadingRoute: Boolean,
     onCurrentRangeChange: (String) -> Unit,
     onRoutePreferencesChange: (String) -> Unit,
+    onAddStopClick: () -> Unit,
+    onRemoveStopClick: (RouteStopUi) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -642,6 +714,87 @@ fun RouteDetailsDialog(
                         unfocusedPlaceholderColor = MutedText
                     )
                 )
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Stops",
+                            color = Orange,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        OutlinedButton(
+                            enabled = !isLoadingRoute,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Orange
+                            ),
+                            onClick = onAddStopClick
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add a stop")
+                        }
+                    }
+
+                    if (stops.isEmpty()) {
+                        Text(
+                            text = "No stops added",
+                            color = MutedText,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        stops.forEachIndexed { index, stop ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF243D50))
+                                    .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = "${index + 1}. ${stop.name}",
+                                        color = SoftWhite,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+
+                                    if (stop.address.isNotBlank()) {
+                                        Text(
+                                            text = stop.address,
+                                            color = MutedText,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    enabled = !isLoadingRoute,
+                                    onClick = { onRemoveStopClick(stop) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = "Remove stop",
+                                        tint = MutedText
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if (isLoadingRoute) {
                     LinearProgressIndicator(

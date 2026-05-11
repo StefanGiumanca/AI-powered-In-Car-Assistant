@@ -12,6 +12,7 @@ data class TripRequest (
     val destination_label: String,
     val destination_lat: Double,
     val destination_lng: Double,
+    val stops: List<RouteLocationDto> = emptyList(),
 
     val departure_time: String,
     val requested_mode: String,
