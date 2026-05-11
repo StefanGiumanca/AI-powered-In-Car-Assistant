@@ -14,6 +14,7 @@ def get_route(
     origin_lng: float,
     dest_lat: float,
     dest_lng: float,
+    intermediates: list[dict[str, float]] | None = None,
 ) -> dict:
     api_key = os.getenv("GOOGLE_MAPS_API_KEY")
     if not api_key:
@@ -44,6 +45,19 @@ def get_route(
         "polylineQuality": "OVERVIEW",
         "polylineEncoding": "ENCODED_POLYLINE",
     }
+
+    if intermediates:
+        payload["intermediates"] = [
+            {
+                "location": {
+                    "latLng": {
+                        "latitude": stop["lat"],
+                        "longitude": stop["lng"],
+                    },
+                },
+            }
+            for stop in intermediates
+        ]
 
     headers = {
         "Content-Type": "application/json",

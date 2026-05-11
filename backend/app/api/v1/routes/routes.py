@@ -14,6 +14,13 @@ def preview_route(payload: RoutePreviewRequest) -> RoutePreviewResponse:
         origin_lng=payload.origin.lng,
         dest_lat=payload.destination.lat,
         dest_lng=payload.destination.lng,
+        intermediates=[
+            {
+                "lat": stop.lat,
+                "lng": stop.lng,
+            }
+            for stop in payload.stops
+        ],
     )
 
     return RoutePreviewResponse(**route)

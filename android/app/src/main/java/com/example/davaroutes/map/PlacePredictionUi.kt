@@ -5,3 +5,10 @@ data class PlacePredictionUi(
     val primaryText: String,
     val secondaryText: String
 )
+
+data class RouteStopUi(
+    val name: String,
+    val address: String,
+    val lat: Double,
+    val lng: Double
+)

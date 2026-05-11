@@ -398,7 +398,7 @@ class UserDashboard : ComponentActivity() {
             }
         ) {
             Text(
-                text = "Plan Trip",
+                text = "Go to Map",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp

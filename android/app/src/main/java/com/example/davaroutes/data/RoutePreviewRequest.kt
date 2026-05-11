@@ -9,6 +9,7 @@ data class RouteLocationDto(
 data class RoutePreviewRequest(
     val origin: RouteLocationDto,
     val destination: RouteLocationDto,
+    val stops: List<RouteLocationDto> = emptyList(),
     val current_range: String?,
     val route_preferences: String?
 )
