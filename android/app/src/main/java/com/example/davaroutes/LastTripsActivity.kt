@@ -56,6 +56,9 @@ class LastTripsActivity : ComponentActivity() {
     private fun LastTripsContent(activity: LastTripsActivity) {
         val navigationHistory = remember { activity.loadNavigationHistory() }
         val recentPlaces = remember { activity.loadRecentPlaces() }
+        val tripInsights = remember(navigationHistory) {
+            buildTripInsights(navigationHistory)
+        }
 
         Column(
             modifier = Modifier
@@ -114,11 +117,20 @@ class LastTripsActivity : ComponentActivity() {
 
             SectionTitle("Post-trip Analytics")
             InfoCard {
-                ComingSoonRow("Cost and charging summary")
-                Divider(color = Color(0xFF35566B))
-                ComingSoonRow("Time saved")
-                Divider(color = Color(0xFF35566B))
-                ComingSoonRow("Efficiency score")
+                if (tripInsights.isEmpty()) {
+                    Text(
+                        text = "Generate routes to unlock distance, duration, and stop usage insights.",
+                        color = MutedText,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    tripInsights.forEachIndexed { index, insight ->
+                        TripInsightRow(insight)
+                        if (index < tripInsights.lastIndex) {
+                            Divider(color = Color(0xFF35566B))
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -202,6 +214,21 @@ class LastTripsActivity : ComponentActivity() {
                 color = Orange,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
+    @Composable
+    private fun TripInsightRow(insight: TripInsightUi) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(insight.label, color = MutedText)
+                Text(insight.value, color = Orange, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                text = insight.description,
+                color = SoftWhite,
+                style = MaterialTheme.typography.bodySmall
             )
         }
     }
@@ -291,6 +318,52 @@ class LastTripsActivity : ComponentActivity() {
     }
 }
 
+private fun buildTripInsights(routes: List<NavigationHistoryUi>): List<TripInsightUi> {
+    if (routes.isEmpty()) return emptyList()
+
+    val totalDistance = routes.sumOf { it.distanceKm }
+    val averageDuration = routes.map { it.durationMinutes }.average()
+    val totalStops = routes.sumOf { it.stops.size }
+    val longestRoute = routes.maxByOrNull { it.distanceKm }
+    val latestRoute = routes.firstOrNull()
+
+    return listOfNotNull(
+        TripInsightUi(
+            label = "Planned distance",
+            value = "%.1f km".format(totalDistance),
+            description = "Total distance across ${routes.size} saved generated route${if (routes.size == 1) "" else "s"}."
+        ),
+        TripInsightUi(
+            label = "Average duration",
+            value = "%.0f min".format(averageDuration),
+            description = "Average planned travel time from saved route previews."
+        ),
+        TripInsightUi(
+            label = "Saved stops",
+            value = totalStops.toString(),
+            description = if (totalStops == 0) {
+                "No saved stop recommendations yet. Add route stops to enrich trip history."
+            } else {
+                "Stop count extracted from saved route history, not live vehicle telemetry."
+            }
+        ),
+        longestRoute?.let {
+            TripInsightUi(
+                label = "Longest route",
+                value = "%.1f km".format(it.distanceKm),
+                description = it.destinationName.ifBlank { "Saved destination" }
+            )
+        },
+        latestRoute?.let {
+            TripInsightUi(
+                label = "Latest route",
+                value = "%.0f min".format(it.durationMinutes),
+                description = it.destinationName.ifBlank { "Most recent saved destination" }
+            )
+        }
+    )
+}
+
 private data class NavigationHistoryUi(
     val destinationName: String,
     val destinationAddress: String,
@@ -304,4 +377,10 @@ private data class RecentPlaceUi(
     val address: String,
     val lat: Double,
     val lng: Double
+)
+
+private data class TripInsightUi(
+    val label: String,
+    val value: String,
+    val description: String
 )
