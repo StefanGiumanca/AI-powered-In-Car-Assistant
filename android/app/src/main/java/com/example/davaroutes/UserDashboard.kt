@@ -201,6 +201,8 @@ class UserDashboard : ComponentActivity() {
                             intent.putExtra("full_name", fullName)
                             intent.putExtra("email", email)
                             intent.putExtra("user_id", userId)
+                            intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesToJson(vehicles))
+                            intent.putExtra(EXTRA_SELECTED_VEHICLE_ID, selectedVehicleId)
                             activity.startActivity(intent)
                         }
                     )
