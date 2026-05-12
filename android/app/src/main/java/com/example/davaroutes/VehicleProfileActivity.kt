@@ -83,6 +83,8 @@ class VehicleProfileActivity : ComponentActivity() {
         activity: VehicleProfileActivity
     ) {
         val vehicleList = remember { mutableStateOf(vehicles) }
+        val selectedVehicle = vehicleList.value.firstOrNull { it.id == selectedVehicleId }
+            ?: vehicleList.value.firstOrNull()
 
         Column(
             modifier = Modifier
@@ -134,11 +136,23 @@ class VehicleProfileActivity : ComponentActivity() {
 
             SectionTitle("Service Monitor")
             InfoCard {
-                ComingSoonRow("Service interval alerts")
+                StatusRow(
+                    label = "Setup completeness",
+                    value = selectedVehicle.setupCompletenessLabel(),
+                    description = selectedVehicle.setupCompletenessDescription()
+                )
                 HorizontalDivider(color = Color(0xFF35566B))
-                ComingSoonRow("Odometer tracking")
+                StatusRow(
+                    label = "Service reminders",
+                    value = selectedVehicle.serviceReadinessLabel(),
+                    description = selectedVehicle.serviceReadinessDescription()
+                )
                 HorizontalDivider(color = Color(0xFF35566B))
-                ComingSoonRow("Battery health history")
+                StatusRow(
+                    label = "Range profile",
+                    value = selectedVehicle.rangeProfileLabel(),
+                    description = selectedVehicle.rangeProfileDescription()
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -360,6 +374,113 @@ private fun VehicleResponse.serviceLabel(): String {
     return service_interval_km?.let { "$it km" }
         ?: service_interval_months?.let { "$it months" }
         ?: "Not set"
+}
+
+private fun VehicleResponse?.setupCompletenessLabel(): String {
+    return this?.let { "${it.setupCompletenessPercent()}%" } ?: "No vehicle"
+}
+
+private fun VehicleResponse?.setupCompletenessDescription(): String {
+    if (this == null) {
+        return "Add a vehicle to unlock setup quality checks and personalized route estimates."
+    }
+
+    val missingFields = listOfNotNull(
+        "model".takeIf { model.isBlank() },
+        "year".takeIf { year == null },
+        "connector".takeIf { powertrain.equals("EV", ignoreCase = true) && connector_type.isNullOrBlank() },
+        "battery capacity".takeIf { powertrain.equals("EV", ignoreCase = true) && battery_capacity_kwh == null },
+        "fuel tank".takeIf { !powertrain.equals("EV", ignoreCase = true) && fuel_tank_liters == null },
+        "consumption".takeIf { consumption_kwh_per_100km == null && consumption_l_per_100km == null },
+        "service interval".takeIf { service_interval_km == null && service_interval_months == null }
+    )
+
+    return if (missingFields.isEmpty()) {
+        "Vehicle setup has the fields needed for route, range, and service estimates."
+    } else {
+        "Add ${missingFields.joinToString(", ")} to improve estimates. No live vehicle hardware is required."
+    }
+}
+
+private fun VehicleResponse.setupCompletenessPercent(): Int {
+    val checks = listOf(
+        model.isNotBlank(),
+        year != null,
+        powertrain.isNotBlank(),
+        if (powertrain.equals("EV", ignoreCase = true)) !connector_type.isNullOrBlank() else true,
+        if (powertrain.equals("EV", ignoreCase = true)) battery_capacity_kwh != null else fuel_tank_liters != null,
+        consumption_kwh_per_100km != null || consumption_l_per_100km != null,
+        service_interval_km != null || service_interval_months != null
+    )
+
+    return checks.count { it } * 100 / checks.size
+}
+
+private fun VehicleResponse?.serviceReadinessLabel(): String {
+    return when {
+        this == null -> "No vehicle"
+        service_interval_km != null && service_interval_months != null -> "Distance + time"
+        service_interval_km != null -> "Distance based"
+        service_interval_months != null -> "Time based"
+        else -> "Not configured"
+    }
+}
+
+private fun VehicleResponse?.serviceReadinessDescription(): String {
+    if (this == null) {
+        return "Add a vehicle and service interval to enable manual service reminders."
+    }
+
+    val interval = serviceLabel()
+    return if (interval == "Not set") {
+        "Set a service interval in the vehicle profile. Real diagnostics need car hardware/OEM access."
+    } else {
+        "Reminder readiness is based on your manual interval: $interval. Live odometer data is not read automatically."
+    }
+}
+
+private fun VehicleResponse?.rangeProfileLabel(): String {
+    return when {
+        this == null -> "No vehicle"
+        powertrain.equals("EV", ignoreCase = true) && battery_capacity_kwh != null && consumption_kwh_per_100km != null -> "Estimated EV range"
+        !powertrain.equals("EV", ignoreCase = true) && fuel_tank_liters != null && consumption_l_per_100km != null -> "Estimated fuel range"
+        consumption_kwh_per_100km != null || consumption_l_per_100km != null -> "Consumption set"
+        else -> "Needs data"
+    }
+}
+
+private fun VehicleResponse?.rangeProfileDescription(): String {
+    if (this == null) {
+        return "Add a vehicle to estimate practical range from manually entered specs."
+    }
+
+    val evRange = if (
+        powertrain.equals("EV", ignoreCase = true) &&
+        battery_capacity_kwh != null &&
+        consumption_kwh_per_100km != null &&
+        consumption_kwh_per_100km > 0
+    ) {
+        battery_capacity_kwh / consumption_kwh_per_100km * 100
+    } else {
+        null
+    }
+
+    val fuelRange = if (
+        !powertrain.equals("EV", ignoreCase = true) &&
+        fuel_tank_liters != null &&
+        consumption_l_per_100km != null &&
+        consumption_l_per_100km > 0
+    ) {
+        fuel_tank_liters / consumption_l_per_100km * 100
+    } else {
+        null
+    }
+
+    return when {
+        evRange != null -> "Estimated full-charge range is about ${evRange.cleanNumber()} km, based on capacity and consumption."
+        fuelRange != null -> "Estimated full-tank range is about ${fuelRange.cleanNumber()} km, based on tank size and consumption."
+        else -> "Add capacity or tank size plus consumption to estimate range. Battery health still requires vehicle telemetry."
+    }
 }
 
 private fun Double.cleanNumber(): String {
