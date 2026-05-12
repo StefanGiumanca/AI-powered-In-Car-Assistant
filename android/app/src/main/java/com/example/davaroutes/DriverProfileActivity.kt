@@ -43,6 +43,10 @@ import com.example.davaroutes.ui.theme.MutedText
 import com.example.davaroutes.ui.theme.NavyCard
 import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
+import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
+import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
+import com.example.davaroutes.data.VehicleResponse
+import com.example.davaroutes.data.vehiclesFromJson
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
@@ -54,6 +58,10 @@ class DriverProfileActivity : ComponentActivity() {
         val fullName = intent.getStringExtra("full_name") ?: ""
         val email = intent.getStringExtra("email") ?: ""
         val userId = intent.getStringExtra("user_id") ?: ""
+        val vehicles = vehiclesFromJson(intent.getStringExtra(EXTRA_VEHICLES_JSON))
+        val selectedVehicleId = intent.getStringExtra(EXTRA_SELECTED_VEHICLE_ID)
+        val selectedVehicle = vehicles.firstOrNull { it.id == selectedVehicleId }
+            ?: vehicles.firstOrNull()
 
         setContent {
             DavaRoutesTheme {
@@ -61,6 +69,8 @@ class DriverProfileActivity : ComponentActivity() {
                     fullName = fullName,
                     email = email,
                     userId = userId,
+                    vehicles = vehicles,
+                    selectedVehicle = selectedVehicle,
                     activity = this@DriverProfileActivity
                 )
             }
@@ -72,8 +82,18 @@ class DriverProfileActivity : ComponentActivity() {
         fullName: String,
         email: String,
         userId: String,
+        vehicles: List<VehicleResponse>,
+        selectedVehicle: VehicleResponse?,
         activity: DriverProfileActivity
     ) {
+        val setupItems = listOf(
+            fullName.isNotBlank(),
+            email.isNotBlank(),
+            vehicles.isNotEmpty(),
+            selectedVehicle != null
+        )
+        val completionPercent = setupItems.count { it } * 100 / setupItems.size
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -113,11 +133,28 @@ class DriverProfileActivity : ComponentActivity() {
 
             SectionTitle("Management")
             InfoCard {
-                ComingSoonRow("Profile completion")
+                StatusRow(
+                    label = "Profile completion",
+                    value = "$completionPercent%",
+                    description = buildCompletionDescription(
+                        fullName = fullName,
+                        email = email,
+                        hasVehicles = vehicles.isNotEmpty(),
+                        hasSelectedVehicle = selectedVehicle != null
+                    )
+                )
                 Divider(color = Color(0xFF35566B))
-                ComingSoonRow("Driving behavior history")
+                StatusRow(
+                    label = "Route preferences",
+                    value = selectedVehicle.routePreferenceLabel(),
+                    description = selectedVehicle.routePreferenceDescription()
+                )
                 Divider(color = Color(0xFF35566B))
-                ComingSoonRow("Preferred partners")
+                StatusRow(
+                    label = "Preferred partners",
+                    value = selectedVehicle.partnerPreferenceLabel(),
+                    description = selectedVehicle.partnerPreferenceDescription()
+                )
             }
 
             Button(
@@ -215,5 +252,72 @@ fun ComingSoonRow(label: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = MutedText)
         Text("Coming soon", color = Orange, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun StatusRow(label: String, value: String, description: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, color = MutedText)
+            Text(value, color = Orange, fontWeight = FontWeight.SemiBold)
+        }
+        Text(description, color = SoftWhite, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+private fun buildCompletionDescription(
+    fullName: String,
+    email: String,
+    hasVehicles: Boolean,
+    hasSelectedVehicle: Boolean
+): String {
+    val missingItems = listOfNotNull(
+        "name".takeIf { fullName.isBlank() },
+        "email".takeIf { email.isBlank() },
+        "vehicle".takeIf { !hasVehicles },
+        "main vehicle".takeIf { !hasSelectedVehicle }
+    )
+
+    return if (missingItems.isEmpty()) {
+        "Your account has the core setup needed for personalized routes."
+    } else {
+        "Complete ${missingItems.joinToString(", ")} to improve route personalization."
+    }
+}
+
+private fun VehicleResponse?.routePreferenceLabel(): String {
+    return when (this?.powertrain?.uppercase()) {
+        "EV" -> "Charging-aware"
+        "HYBRID" -> "Balanced"
+        "ICE" -> "Fuel-aware"
+        else -> "Basic"
+    }
+}
+
+private fun VehicleResponse?.routePreferenceDescription(): String {
+    return when (this?.powertrain?.uppercase()) {
+        "EV" -> "Routes can prioritize charging stops, connector compatibility, and range confidence."
+        "HYBRID" -> "Routes can balance fuel stops, charging opportunities, and efficient detours."
+        "ICE" -> "Routes can prioritize fuel stops, service reminders, and lower-detour options."
+        else -> "Add a vehicle to unlock route preferences based on powertrain and consumption."
+    }
+}
+
+private fun VehicleResponse?.partnerPreferenceLabel(): String {
+    return when (this?.powertrain?.uppercase()) {
+        "EV" -> "Charging networks"
+        "HYBRID" -> "Mixed mobility"
+        "ICE" -> "Fuel and service"
+        else -> "Not set"
+    }
+}
+
+private fun VehicleResponse?.partnerPreferenceDescription(): String {
+    return when (this?.powertrain?.uppercase()) {
+        "EV" -> "Relevant partners include fast chargers, destination chargers, food, and hotels."
+        "HYBRID" -> "Relevant partners include fuel chains, charging locations, restaurants, and service centers."
+        "ICE" -> "Relevant partners include fuel chains, restaurants, parking, and service centers."
+        else -> "Add a vehicle so DavaRoutes can suggest relevant partner categories."
     }
 }
