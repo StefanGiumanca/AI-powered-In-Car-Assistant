@@ -39,6 +39,7 @@ from .vehicles import (
     VehicleDTO,
     VehicleResponse,
     VehicleStateDTO,
+    VehicleUpdateRequest,
 )
 from .vehicle_state import VehicleStateCreateRequest, VehicleStateResponse
 
@@ -80,5 +81,6 @@ __all__ = [
     "VehicleResponse",
     "VehicleStateCreateRequest",
     "VehicleStateDTO",
+    "VehicleUpdateRequest",
     "VehicleStateResponse",
 ]

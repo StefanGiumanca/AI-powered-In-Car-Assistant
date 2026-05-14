@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.example.davaroutes.data.EXTRA_CREATED_VEHICLE_JSON
 import com.example.davaroutes.data.EXTRA_DELETED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
+import com.example.davaroutes.data.EXTRA_UPDATED_VEHICLE_JSON
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.example.davaroutes.data.PREF_MAIN_VEHICLE_ID
 import com.example.davaroutes.data.VEHICLE_PREFS
@@ -117,6 +118,9 @@ class UserDashboard : ComponentActivity() {
             if (result.resultCode == RESULT_OK) {
                 val deletedId = result.data?.getStringExtra(EXTRA_DELETED_VEHICLE_ID)
                 val selectedId = result.data?.getStringExtra(EXTRA_SELECTED_VEHICLE_ID)
+                val updatedVehicle = vehicleFromJson(
+                    result.data?.getStringExtra(EXTRA_UPDATED_VEHICLE_JSON)
+                )
 
                 if (!deletedId.isNullOrBlank()) {
                     vehicles = vehicles.filterNot { it.id == deletedId }
@@ -129,6 +133,12 @@ class UserDashboard : ComponentActivity() {
                 if (!selectedId.isNullOrBlank()) {
                     selectedVehicleId = selectedId
                     preferences.edit().putString(PREF_MAIN_VEHICLE_ID, selectedId).apply()
+                }
+
+                if (updatedVehicle != null) {
+                    vehicles = vehicles.map { vehicle ->
+                        if (vehicle.id == updatedVehicle.id) updatedVehicle else vehicle
+                    }
                 }
             }
         }

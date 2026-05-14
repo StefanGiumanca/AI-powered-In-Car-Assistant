@@ -17,6 +17,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.Header
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface ApiService {
@@ -48,6 +49,13 @@ interface ApiService {
 
     @POST("vehicles")
     suspend fun createVehicle(
+        @Header("Authorization") authorization: String,
+        @Body vehicle: VehicleCreateRequest
+    ): Response<VehicleResponse>
+
+    @PUT("vehicles/{vehicleId}")
+    suspend fun updateVehicle(
+        @Path("vehicleId") vehicleId: String,
         @Header("Authorization") authorization: String,
         @Body vehicle: VehicleCreateRequest
     ): Response<VehicleResponse>

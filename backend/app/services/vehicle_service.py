@@ -1,10 +1,11 @@
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.models import User, Vehicle
-from app.schemas import VehicleCreateRequest, VehicleResponse
+from app.schemas import VehicleCreateRequest, VehicleResponse, VehicleUpdateRequest
 
 
 def _to_decimal(value: float | None) -> Decimal | None:
@@ -12,6 +13,13 @@ def _to_decimal(value: float | None) -> Decimal | None:
         return None
 
     return Decimal(str(value))
+
+
+def _parse_vehicle_id(vehicle_id: str) -> UUID:
+    try:
+        return UUID(vehicle_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Vehicle not found") from None
 
 
 def vehicle_to_response(vehicle: Vehicle) -> VehicleResponse:
@@ -80,8 +88,10 @@ def delete_vehicle(
     vehicle_id: str,
 ) -> None:
     """Delete a vehicle if it belongs to current user"""
+    parsed_vehicle_id = _parse_vehicle_id(vehicle_id)
+
     vehicle = db.query(Vehicle).filter(
-        Vehicle.id == vehicle_id,
+        Vehicle.id == parsed_vehicle_id,
         Vehicle.user_id == current_user.id,
     ).first()
 
@@ -90,3 +100,37 @@ def delete_vehicle(
 
     db.delete(vehicle)
     db.commit()
+
+
+def update_vehicle(
+    db: Session,
+    current_user: User,
+    vehicle_id: str,
+    payload: VehicleUpdateRequest,
+) -> VehicleResponse:
+    parsed_vehicle_id = _parse_vehicle_id(vehicle_id)
+
+    vehicle = db.query(Vehicle).filter(
+        Vehicle.id == parsed_vehicle_id,
+        Vehicle.user_id == current_user.id,
+    ).first()
+
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    vehicle.vin = payload.vin
+    vehicle.model = payload.model
+    vehicle.year = payload.year
+    vehicle.powertrain = payload.powertrain
+    vehicle.connector_type = payload.connector_type
+    vehicle.battery_capacity_kwh = _to_decimal(payload.battery_capacity_kwh)
+    vehicle.fuel_tank_liters = _to_decimal(payload.fuel_tank_liters)
+    vehicle.consumption_kwh_per_100km = _to_decimal(payload.consumption_kwh_per_100km)
+    vehicle.consumption_l_per_100km = _to_decimal(payload.consumption_l_per_100km)
+    vehicle.service_interval_km = payload.service_interval_km
+    vehicle.service_interval_months = payload.service_interval_months
+
+    db.commit()
+    db.refresh(vehicle)
+
+    return vehicle_to_response(vehicle)

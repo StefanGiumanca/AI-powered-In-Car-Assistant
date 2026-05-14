@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.db.models import User
-from app.schemas import VehicleCreateRequest, VehicleResponse
-from app.services.vehicle_service import create_vehicle, delete_vehicle
+from app.schemas import VehicleCreateRequest, VehicleResponse, VehicleUpdateRequest
+from app.services.vehicle_service import create_vehicle, delete_vehicle, update_vehicle
 
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
@@ -26,6 +26,24 @@ def create_vehicle_endpoint(
     return create_vehicle(
         db=db,
         current_user=current_user,
+        payload=payload,
+    )
+
+
+@router.put(
+    "/{vehicle_id}",
+    response_model=VehicleResponse,
+)
+def update_vehicle_endpoint(
+    vehicle_id: str,
+    payload: VehicleUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> VehicleResponse:
+    return update_vehicle(
+        db=db,
+        current_user=current_user,
+        vehicle_id=vehicle_id,
         payload=payload,
     )
 

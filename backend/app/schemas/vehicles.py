@@ -47,6 +47,10 @@ class VehicleCreateRequest(APIModel):
         return self
 
 
+class VehicleUpdateRequest(VehicleCreateRequest):
+    pass
+
+
 class VehicleResponse(APIModel):
     id: str
     vin: str | None = None
