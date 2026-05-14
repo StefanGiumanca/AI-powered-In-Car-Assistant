@@ -45,8 +45,11 @@ import com.example.davaroutes.ui.theme.Orange
 import com.example.davaroutes.ui.theme.SoftWhite
 import com.example.davaroutes.data.EXTRA_DELETED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
+import com.example.davaroutes.data.EXTRA_UPDATED_VEHICLE_JSON
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
+import com.example.davaroutes.data.VehicleCreateRequest
 import com.example.davaroutes.data.VehicleResponse
+import com.example.davaroutes.data.vehicleToJson
 import com.example.davaroutes.data.vehiclesFromJson
 import com.example.davaroutes.network.RetrofitClient
 import kotlinx.coroutines.launch
@@ -129,6 +132,11 @@ class VehicleProfileActivity : ComponentActivity() {
                         },
                         onDelete = {
                             vehicleList.value = vehicleList.value.filter { it.id != vehicle.id }
+                        },
+                        onUpdate = { updatedVehicle ->
+                            vehicleList.value = vehicleList.value.map {
+                                if (it.id == updatedVehicle.id) updatedVehicle else it
+                            }
                         }
                     )
                 }
@@ -207,10 +215,12 @@ class VehicleProfileActivity : ComponentActivity() {
         tokenType: String,
         activity: VehicleProfileActivity,
         onSelect: () -> Unit,
-        onDelete: () -> Unit
+        onDelete: () -> Unit,
+        onUpdate: (VehicleResponse) -> Unit
     ) {
         val scope = rememberCoroutineScope()
         val showDeleteConfirm = remember { mutableStateOf(false) }
+        val showEditDialog = remember { mutableStateOf(false) }
         val showDetails = remember { mutableStateOf(false) }
         
         Card(
@@ -269,6 +279,18 @@ class VehicleProfileActivity : ComponentActivity() {
                     Button(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF35566B),
+                            contentColor = SoftWhite
+                        ),
+                        onClick = { showEditDialog.value = true }
+                    ) {
+                        Text("Edit")
+                    }
+
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
                         enabled = !isSelected,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Orange,
@@ -281,21 +303,59 @@ class VehicleProfileActivity : ComponentActivity() {
                         Text(if (isSelected) "Selected as Main Car" else "Use as Main Car")
                     }
 
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE53935),
-                            contentColor = Color.White
-                        ),
-                        onClick = {
-                            showDeleteConfirm.value = true
-                        }
-                    ) {
-                        Text("Delete")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White
+                    ),
+                    onClick = {
+                        showDeleteConfirm.value = true
                     }
+                ) {
+                    Text("Delete")
                 }
             }
+        }
+
+        if (showEditDialog.value) {
+            EditVehicleDialog(
+                vehicle = vehicle,
+                onDismiss = { showEditDialog.value = false },
+                onSave = { request ->
+                    scope.launch {
+                        try {
+                            val response = RetrofitClient.api.updateVehicle(
+                                vehicleId = vehicle.id,
+                                authorization = "$tokenType $accessToken",
+                                vehicle = request
+                            )
+
+                            if (response.isSuccessful) {
+                                response.body()?.let { updatedVehicle ->
+                                    onUpdate(updatedVehicle)
+                                    val resultIntent = Intent().apply {
+                                        putExtra(
+                                            EXTRA_UPDATED_VEHICLE_JSON,
+                                            vehicleToJson(updatedVehicle)
+                                        )
+                                    }
+                                    activity.setResult(RESULT_OK, resultIntent)
+                                    Toast.makeText(activity, "Vehicle updated", Toast.LENGTH_SHORT).show()
+                                }
+                                showEditDialog.value = false
+                            } else {
+                                Toast.makeText(activity, "Failed to update vehicle", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(activity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            )
         }
         
         if (showDeleteConfirm.value) {
@@ -349,6 +409,109 @@ class VehicleProfileActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun EditVehicleDialog(
+        vehicle: VehicleResponse,
+        onDismiss: () -> Unit,
+        onSave: (VehicleCreateRequest) -> Unit
+    ) {
+        val vin = remember { mutableStateOf(vehicle.vin.orEmpty()) }
+        val model = remember { mutableStateOf(vehicle.model) }
+        val year = remember { mutableStateOf(vehicle.year?.toString().orEmpty()) }
+        val powertrain = remember { mutableStateOf(vehicle.powertrain) }
+        val connectorType = remember { mutableStateOf(vehicle.connector_type.orEmpty()) }
+        val batteryCapacity = remember { mutableStateOf(vehicle.battery_capacity_kwh?.cleanNumber().orEmpty()) }
+        val fuelTank = remember { mutableStateOf(vehicle.fuel_tank_liters?.cleanNumber().orEmpty()) }
+        val consumptionKwh = remember { mutableStateOf(vehicle.consumption_kwh_per_100km?.cleanNumber().orEmpty()) }
+        val consumptionLiters = remember { mutableStateOf(vehicle.consumption_l_per_100km?.cleanNumber().orEmpty()) }
+        val serviceKm = remember { mutableStateOf(vehicle.service_interval_km?.toString().orEmpty()) }
+        val serviceMonths = remember { mutableStateOf(vehicle.service_interval_months?.toString().orEmpty()) }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Edit Vehicle", color = SoftWhite) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(460.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    EditVehicleField(model.value, { model.value = it }, "Model")
+                    EditVehicleField(vin.value, { vin.value = it }, "VIN optional")
+                    EditVehicleField(year.value, { year.value = it }, "Year optional")
+                    EditVehicleField(powertrain.value, { powertrain.value = it.uppercase() }, "Powertrain")
+                    EditVehicleField(connectorType.value, { connectorType.value = it }, "Connector type optional")
+                    EditVehicleField(batteryCapacity.value, { batteryCapacity.value = it }, "Battery capacity kWh optional")
+                    EditVehicleField(fuelTank.value, { fuelTank.value = it }, "Fuel tank liters optional")
+                    EditVehicleField(consumptionKwh.value, { consumptionKwh.value = it }, "Consumption kWh/100km optional")
+                    EditVehicleField(consumptionLiters.value, { consumptionLiters.value = it }, "Consumption L/100km optional")
+                    EditVehicleField(serviceKm.value, { serviceKm.value = it }, "Service interval km optional")
+                    EditVehicleField(serviceMonths.value, { serviceMonths.value = it }, "Service interval months optional")
+                }
+            },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Orange),
+                    onClick = {
+                        val normalizedPowertrain = powertrain.value.trim().uppercase()
+                        if (model.value.isBlank()) {
+                            Toast.makeText(this, "Model is required", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (normalizedPowertrain !in setOf("EV", "ICE", "HYBRID")) {
+                            Toast.makeText(this, "Powertrain must be EV, ICE, or HYBRID", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+
+                        onSave(
+                            VehicleCreateRequest(
+                                vin = vin.value.blankToNull(),
+                                model = model.value.trim(),
+                                year = year.value.toIntOrNull(),
+                                powertrain = normalizedPowertrain,
+                                connector_type = connectorType.value.blankToNull(),
+                                battery_capacity_kwh = if (normalizedPowertrain == "ICE") null else batteryCapacity.value.toDoubleOrNull(),
+                                fuel_tank_liters = if (normalizedPowertrain == "EV") null else fuelTank.value.toDoubleOrNull(),
+                                consumption_kwh_per_100km = if (normalizedPowertrain == "ICE") null else consumptionKwh.value.toDoubleOrNull(),
+                                consumption_l_per_100km = if (normalizedPowertrain == "EV") null else consumptionLiters.value.toDoubleOrNull(),
+                                service_interval_km = serviceKm.value.toIntOrNull(),
+                                service_interval_months = serviceMonths.value.toIntOrNull()
+                            )
+                        )
+                    }
+                ) {
+                    Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF35566B)),
+                    onClick = onDismiss
+                ) {
+                    Text("Cancel", color = SoftWhite)
+                }
+            },
+            containerColor = NavyCard
+        )
+    }
+
+    @Composable
+    private fun EditVehicleField(
+        value: String,
+        onValueChange: (String) -> Unit,
+        label: String
+    ) {
+        androidx.compose.material3.OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+    }
+
+    @Composable
     private fun VehicleDetailRow(label: String, value: String) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -359,6 +522,8 @@ class VehicleProfileActivity : ComponentActivity() {
         }
     }
 }
+
+private fun String.blankToNull(): String? = trim().takeIf { it.isNotEmpty() }
 
 private fun VehicleResponse.headerDetails(): String {
     return listOfNotNull(year?.toString(), powertrain).joinToString(" - ")

@@ -239,6 +239,89 @@ def test_create_vehicle_invalid_powertrain_returns_422(db_session_factory):
     assert "detail" in body
 
 
+def test_update_vehicle_success(db_session_factory):
+    user = create_user(db_session_factory)
+    db = db_session_factory()
+    try:
+        vehicle = Vehicle(
+            user_id=user.id,
+            model="Old Model",
+            year=2020,
+            powertrain="ICE",
+            fuel_tank_liters=45,
+            consumption_l_per_100km=7.5,
+        )
+        db.add(vehicle)
+        db.commit()
+        db.refresh(vehicle)
+        vehicle_id = str(vehicle.id)
+    finally:
+        db.close()
+
+    status, body = asyncio.run(
+        request_app(
+            "PUT",
+            f"/vehicles/{vehicle_id}",
+            {
+                "vin": None,
+                "model": "Updated EV",
+                "year": 2024,
+                "powertrain": "EV",
+                "connector_type": "CCS2",
+                "battery_capacity_kwh": 75,
+                "fuel_tank_liters": None,
+                "consumption_kwh_per_100km": 16.5,
+                "consumption_l_per_100km": None,
+                "service_interval_km": 20000,
+                "service_interval_months": 12,
+            },
+            headers=auth_headers(user),
+        )
+    )
+
+    assert status == 200
+    assert body["id"] == vehicle_id
+    assert body["model"] == "Updated EV"
+    assert body["powertrain"] == "EV"
+    assert body["connector_type"] == "CCS2"
+    assert body["battery_capacity_kwh"] == 75.0
+    assert body["fuel_tank_liters"] is None
+
+
+def test_update_vehicle_for_another_user_returns_404(db_session_factory):
+    owner = create_user(db_session_factory, email="owner@test.com")
+    other_user = create_user(db_session_factory, email="other@test.com")
+    db = db_session_factory()
+    try:
+        vehicle = Vehicle(
+            user_id=owner.id,
+            model="Owner Car",
+            year=2020,
+            powertrain="ICE",
+        )
+        db.add(vehicle)
+        db.commit()
+        db.refresh(vehicle)
+        vehicle_id = str(vehicle.id)
+    finally:
+        db.close()
+
+    status, body = asyncio.run(
+        request_app(
+            "PUT",
+            f"/vehicles/{vehicle_id}",
+            {
+                "model": "Illegal Update",
+                "powertrain": "ICE",
+            },
+            headers=auth_headers(other_user),
+        )
+    )
+
+    assert status == 404
+    assert body["detail"] == "Vehicle not found"
+
+
 def test_create_driver_profile_success(db_session_factory):
     user = create_user(db_session_factory)
 
