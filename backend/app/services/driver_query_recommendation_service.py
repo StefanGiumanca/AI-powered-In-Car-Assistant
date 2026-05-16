@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -37,30 +38,60 @@ async def recommend_from_driver_query(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    vehicle = db.query(dbm.Vehicle).filter(dbm.Vehicle.id == UUID(payload.vehicle_id)).first()
+    vehicle = None
+    if payload.vehicle_id:
+        vehicle = db.query(dbm.Vehicle).filter(dbm.Vehicle.id == UUID(payload.vehicle_id)).first()
+
     if vehicle is None:
-        raise HTTPException(status_code=404, detail="Vehicle not found.")
+        vehicle = (
+            db.query(dbm.Vehicle)
+            .filter(dbm.Vehicle.user_id == user.id)
+            .first()
+        )
 
-    driver_profile = (
-        db.query(dbm.DriverProfile)
-        .filter(dbm.DriverProfile.id == UUID(payload.driver_profile_id))
-        .first()
-    )
+    driver_profile = None
+    if payload.driver_profile_id:
+        driver_profile = (
+            db.query(dbm.DriverProfile)
+            .filter(dbm.DriverProfile.id == UUID(payload.driver_profile_id))
+            .first()
+        )
+
     if driver_profile is None:
-        raise HTTPException(status_code=404, detail="Driver profile not found.")
+        driver_profile = (
+            db.query(dbm.DriverProfile)
+            .filter(dbm.DriverProfile.user_id == user.id)
+            .first()
+        )
 
-    vehicle_state = (
-        db.query(dbm.VehicleStateSnapshot)
-        .filter(dbm.VehicleStateSnapshot.vehicle_id == vehicle.id)
-        .order_by(dbm.VehicleStateSnapshot.captured_at.desc())
-        .first()
-    )
+    if driver_profile is None:
+        driver_profile = SimpleNamespace(
+            preferred_brands=[],
+            preferred_amenities=[],
+            profile_type="balanced",
+        )
+
+    vehicle_state = None
+    if vehicle is not None:
+        vehicle_state = (
+            db.query(dbm.VehicleStateSnapshot)
+            .filter(dbm.VehicleStateSnapshot.vehicle_id == vehicle.id)
+            .order_by(dbm.VehicleStateSnapshot.captured_at.desc())
+            .first()
+        )
 
     interpretation = interpret_driver_query(payload.query)
-    radius_meters = radius_override_meters or determine_initial_radius(
-        interpretation=interpretation,
-        vehicle=vehicle,
-        vehicle_state=vehicle_state,
+    radius_meters = (
+        radius_override_meters
+        or (
+            determine_initial_radius(
+                interpretation=interpretation,
+                vehicle=vehicle,
+                vehicle_state=vehicle_state,
+            )
+            if vehicle is not None
+            else interpretation.radius_meters
+        )
     )
 
     try:

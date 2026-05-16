@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.davaroutes.data.EXTRA_CREATED_VEHICLE_JSON
 import com.example.davaroutes.data.EXTRA_DELETED_VEHICLE_ID
+import com.example.davaroutes.data.EXTRA_DRIVER_PROFILES_JSON
 import com.example.davaroutes.data.EXTRA_SELECTED_VEHICLE_ID
 import com.example.davaroutes.data.EXTRA_UPDATED_VEHICLE_JSON
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
@@ -55,6 +56,7 @@ class UserDashboard : ComponentActivity() {
         val email = intent.getStringExtra("email") ?: ""
         val fullName = intent.getStringExtra("full_name") ?: ""
         val vehiclesJson = intent.getStringExtra(EXTRA_VEHICLES_JSON) ?: "[]"
+        val driverProfilesJson = intent.getStringExtra(EXTRA_DRIVER_PROFILES_JSON) ?: "[]"
 
         setContent {
             DavaRoutesTheme {
@@ -65,6 +67,7 @@ class UserDashboard : ComponentActivity() {
                     email = email,
                     fullName = fullName,
                     vehiclesJson = vehiclesJson,
+                    driverProfilesJson = driverProfilesJson,
                     activity = this@UserDashboard
                 )
             }
@@ -79,6 +82,7 @@ class UserDashboard : ComponentActivity() {
         email: String,
         fullName: String,
         vehiclesJson: String,
+        driverProfilesJson: String,
         activity: UserDashboard
     ) {
         val preferences = activity.getSharedPreferences(VEHICLE_PREFS, MODE_PRIVATE)
@@ -182,6 +186,7 @@ class UserDashboard : ComponentActivity() {
                     email = email,
                     fullName = fullName,
                     vehiclesJson = vehiclesToJson(vehicles),
+                    driverProfilesJson = driverProfilesJson,
                     activity = activity
                 )
 
@@ -386,6 +391,7 @@ class UserDashboard : ComponentActivity() {
         email: String,
         fullName: String,
         vehiclesJson: String,
+        driverProfilesJson: String,
         activity: UserDashboard
     ) {
         Button(
@@ -406,6 +412,7 @@ class UserDashboard : ComponentActivity() {
                 intent.putExtra("email", email)
                 intent.putExtra("full_name", fullName)
                 intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesJson)
+                intent.putExtra(EXTRA_DRIVER_PROFILES_JSON, driverProfilesJson)
                 activity.startActivity(intent)
             }
         ) {

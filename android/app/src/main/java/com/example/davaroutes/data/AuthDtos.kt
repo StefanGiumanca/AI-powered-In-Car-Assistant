@@ -36,6 +36,6 @@ data class RegisterResponse(
 data class BootstrapResponse(
     val user: AuthUser,
     val vehicles: List<VehicleResponse>,
-    val driver_profiles: List<Any>?,
+    val driver_profiles: List<DriverProfileResponse>?,
     val latest_vehicle_state: Any?
 )

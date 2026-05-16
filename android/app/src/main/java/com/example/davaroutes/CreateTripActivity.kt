@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.davaroutes.data.RecommendationQueryRequest
+import com.example.davaroutes.data.RouteLocationDto
 import com.example.davaroutes.data.TripRequest
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
@@ -33,6 +35,8 @@ class CreateTripActivity : ComponentActivity() {
 
         val currentRange = intent.getStringExtra("current_range") ?: ""
         val routePreferences = intent.getStringExtra("route_preferences") ?: ""
+        val vehicleId = intent.getStringExtra("vehicle_id") ?: ""
+        val driverProfileId = intent.getStringExtra("driver_profile_id") ?: ""
 
         setContent {
             DavaRoutesTheme {
@@ -44,7 +48,9 @@ class CreateTripActivity : ComponentActivity() {
                     destinationLat = destinationLat,
                     destinationLng = destinationLng,
                     initialCurrentRange = currentRange,
-                    initialRoutePreferences = routePreferences
+                    initialRoutePreferences = routePreferences,
+                    vehicleId = vehicleId,
+                    driverProfileId = driverProfileId
                 )
             }
         }
@@ -59,7 +65,9 @@ class CreateTripActivity : ComponentActivity() {
         destinationLat: Double,
         destinationLng: Double,
         initialCurrentRange: String,
-        initialRoutePreferences: String
+        initialRoutePreferences: String,
+        vehicleId: String,
+        driverProfileId: String
     ) {
         var currentRange by remember { mutableStateOf(initialCurrentRange) }
         var routePreferences by remember { mutableStateOf(initialRoutePreferences) }
@@ -143,28 +151,38 @@ class CreateTripActivity : ComponentActivity() {
                         return@Button
                     }
 
-                    val trip = TripRequest(
-                        user_id = userId,
-                        vehicle_id = "",
-                        driver_profile_id = null,
-
-                        origin_label = "Current location",
-                        origin_lat = originLat,
-                        origin_lng = originLng,
-
-                        destination_label = destinationName,
-                        destination_lat = destinationLat,
-                        destination_lng = destinationLng,
-
-                        departure_time = LocalDateTime.now().toString(),
-                        requested_mode = "driver",
-
-                        current_range = currentRange,
-                        route_preferences = routePreferences
-                    )
-
                     lifecycleScope.launch {
                         try {
+                            val recommendedStop = findAiRecommendedStop(
+                                userId = userId,
+                                vehicleId = vehicleId,
+                                driverProfileId = driverProfileId,
+                                query = routePreferences,
+                                latitude = originLat,
+                                longitude = originLng
+                            )
+
+                            val trip = TripRequest(
+                                user_id = userId,
+                                vehicle_id = vehicleId,
+                                driver_profile_id = driverProfileId.ifBlank { null },
+
+                                origin_label = "Current location",
+                                origin_lat = originLat,
+                                origin_lng = originLng,
+
+                                destination_label = destinationName,
+                                destination_lat = destinationLat,
+                                destination_lng = destinationLng,
+                                stops = listOfNotNull(recommendedStop),
+
+                                departure_time = LocalDateTime.now().toString(),
+                                requested_mode = "driver",
+
+                                current_range = currentRange,
+                                route_preferences = routePreferences
+                            )
+
                             val response = RetrofitClient.api.createTrip(trip)
 
                             if (response.isSuccessful) {
@@ -193,5 +211,43 @@ class CreateTripActivity : ComponentActivity() {
                 Text("Găsește ruta")
             }
         }
+    }
+
+    private suspend fun findAiRecommendedStop(
+        userId: String,
+        vehicleId: String,
+        driverProfileId: String,
+        query: String,
+        latitude: Double,
+        longitude: Double
+    ): RouteLocationDto? {
+        if (
+            query.isBlank() ||
+            userId.isBlank()
+        ) {
+            return null
+        }
+
+        val response = RetrofitClient.api.recommendFromDriverQuery(
+            RecommendationQueryRequest(
+                user_id = userId,
+                vehicle_id = vehicleId.ifBlank { null },
+                driver_profile_id = driverProfileId.ifBlank { null },
+                query = query,
+                latitude = latitude,
+                longitude = longitude
+            )
+        )
+
+        return response.body()
+            ?.candidates
+            ?.firstOrNull()
+            ?.let { candidate ->
+                RouteLocationDto(
+                    label = candidate.name,
+                    lat = candidate.latitude,
+                    lng = candidate.longitude
+                )
+            }
     }
 }

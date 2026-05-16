@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.data.GoogleLoginRequest
 import com.example.davaroutes.data.LoginRequest
 import com.example.davaroutes.data.LoginResponse
+import com.example.davaroutes.data.driverProfilesToJson
 import com.example.davaroutes.data.vehiclesToJson
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
@@ -306,7 +307,8 @@ class LoginActivity : ComponentActivity() {
             userId = bootstrap?.user?.id ?: body.user.id,
             email = bootstrap?.user?.email ?: body.user.email,
             fullName = bootstrap?.user?.full_name ?: body.user.full_name,
-            vehiclesJson = vehiclesToJson(bootstrap?.vehicles ?: emptyList())
+            vehiclesJson = vehiclesToJson(bootstrap?.vehicles ?: emptyList()),
+            driverProfilesJson = driverProfilesToJson(bootstrap?.driver_profiles ?: emptyList())
         )
     }
 
@@ -316,7 +318,8 @@ class LoginActivity : ComponentActivity() {
         userId: String,
         email: String,
         fullName: String,
-        vehiclesJson: String
+        vehiclesJson: String,
+        driverProfilesJson: String
     ) {
         val intent = Intent(this, MainActivity::class.java)
 
@@ -326,6 +329,7 @@ class LoginActivity : ComponentActivity() {
         intent.putExtra("email", email)
         intent.putExtra("full_name", fullName)
         intent.putExtra("vehicles_json", vehiclesJson)
+        intent.putExtra("driver_profiles_json", driverProfilesJson)
 
         startActivity(intent)
         finish()

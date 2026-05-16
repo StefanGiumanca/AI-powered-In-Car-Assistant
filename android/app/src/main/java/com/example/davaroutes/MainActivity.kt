@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.example.davaroutes.data.EXTRA_DRIVER_PROFILES_JSON
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
 import com.example.davaroutes.map.MapScreen
 import com.example.davaroutes.ui.theme.DavaRoutesTheme
@@ -27,6 +28,7 @@ class MainActivity : ComponentActivity() {
         val email = intent.getStringExtra("email") ?: ""
         val fullName = intent.getStringExtra("full_name") ?: ""
         val vehiclesJson = intent.getStringExtra(EXTRA_VEHICLES_JSON) ?: "[]"
+        val driverProfilesJson = intent.getStringExtra(EXTRA_DRIVER_PROFILES_JSON) ?: "[]"
 
         setContent {
             DavaRoutesTheme {
@@ -37,6 +39,7 @@ class MainActivity : ComponentActivity() {
                     email = email,
                     fullName = fullName,
                     vehiclesJson = vehiclesJson,
+                    driverProfilesJson = driverProfilesJson,
                     activity = this
                 )
             }

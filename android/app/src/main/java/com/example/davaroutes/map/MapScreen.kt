@@ -37,9 +37,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.davaroutes.MainActivity
 import com.example.davaroutes.UserDashboard
+import com.example.davaroutes.data.EXTRA_DRIVER_PROFILES_JSON
 import com.example.davaroutes.data.EXTRA_VEHICLES_JSON
+import com.example.davaroutes.data.RecommendationQueryRequest
 import com.example.davaroutes.data.RouteLocationDto
 import com.example.davaroutes.data.RoutePreviewRequest
+import com.example.davaroutes.data.driverProfilesFromJson
+import com.example.davaroutes.data.vehiclesFromJson
 import com.example.davaroutes.network.RetrofitClient
 import com.example.davaroutes.ui.theme.DarkNavy
 import com.example.davaroutes.ui.theme.NavyCard
@@ -81,6 +85,7 @@ fun MapScreen(
     email: String,
     fullName: String,
     vehiclesJson: String,
+    driverProfilesJson: String,
     activity: MainActivity
 ) {
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
@@ -128,6 +133,10 @@ fun MapScreen(
     val searchHistoryPrefs = remember {
         context.getSharedPreferences("davaroutes_search_history", android.content.Context.MODE_PRIVATE)
     }
+    val vehicles = remember(vehiclesJson) { vehiclesFromJson(vehiclesJson) }
+    val driverProfiles = remember(driverProfilesJson) { driverProfilesFromJson(driverProfilesJson) }
+    val selectedVehicle = vehicles.firstOrNull()
+    val selectedDriverProfile = driverProfiles.firstOrNull()
 
     val placesClient = remember {
         com.google.android.libraries.places.api.Places.createClient(context)
@@ -360,31 +369,61 @@ fun MapScreen(
             return
         }
 
-        val routePreviewRequest = RoutePreviewRequest(
-            origin = RouteLocationDto(
-                label = "Current location",
-                lat = origin.latitude,
-                lng = origin.longitude
-            ),
-            destination = RouteLocationDto(
-                label = destinationName,
-                lat = destination.latitude,
-                lng = destination.longitude
-            ),
-            stops = routeStops.map { stop ->
-                RouteLocationDto(
-                    label = stop.name,
-                    lat = stop.lat,
-                    lng = stop.lng
-                )
-            },
-            current_range = currentRange,
-            route_preferences = routePreferences
-        )
-
         activity.lifecycleScope.launch {
             try {
                 isLoadingRoute = true
+
+                val aiStop = findAiRecommendedStop(
+                    userId = userId,
+                    vehicleId = selectedVehicle?.id.orEmpty(),
+                    driverProfileId = selectedDriverProfile?.id.orEmpty(),
+                    query = routePreferences,
+                    latitude = origin.latitude,
+                    longitude = origin.longitude,
+                    activity = activity
+                )
+
+                val stopsForRoute = if (aiStop != null) {
+                    routeStops
+                        .filterNot { it.lat == aiStop.lat && it.lng == aiStop.lng }
+                        .plus(aiStop)
+                        .take(8)
+                } else {
+                    routeStops
+                }
+
+                if (aiStop != null) {
+                    routeStops = stopsForRoute
+                    saveRecentPlace(aiStop)
+
+                    Toast.makeText(
+                        activity,
+                        "Am adaugat escala recomandata: ${aiStop.name}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                val routePreviewRequest = RoutePreviewRequest(
+                    origin = RouteLocationDto(
+                        label = "Current location",
+                        lat = origin.latitude,
+                        lng = origin.longitude
+                    ),
+                    destination = RouteLocationDto(
+                        label = destinationName,
+                        lat = destination.latitude,
+                        lng = destination.longitude
+                    ),
+                    stops = stopsForRoute.map { stop ->
+                        RouteLocationDto(
+                            label = stop.name,
+                            lat = stop.lat,
+                            lng = stop.lng
+                        )
+                    },
+                    current_range = currentRange,
+                    route_preferences = routePreferences
+                )
 
                 val response = RetrofitClient.api.previewRoute(
                     trip = routePreviewRequest
@@ -1210,6 +1249,7 @@ fun MapScreen(
                 intent.putExtra("email", email)
                 intent.putExtra("full_name", fullName)
                 intent.putExtra(EXTRA_VEHICLES_JSON, vehiclesJson)
+                intent.putExtra(EXTRA_DRIVER_PROFILES_JSON, driverProfilesJson)
 
                 activity.startActivity(intent)
             }
@@ -1403,6 +1443,77 @@ fun MapScreen(
                 }
             )
         }
+    }
+}
+
+private suspend fun findAiRecommendedStop(
+    userId: String,
+    vehicleId: String,
+    driverProfileId: String,
+    query: String,
+    latitude: Double,
+    longitude: Double,
+    activity: MainActivity
+): RouteStopUi? {
+    if (query.isBlank()) {
+        return null
+    }
+
+    return try {
+        if (userId.isBlank()) {
+            Toast.makeText(
+                activity,
+                "Nu pot cere recomandarea AI fara user autentificat.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return null
+        }
+
+        val response = RetrofitClient.api.recommendFromDriverQuery(
+            RecommendationQueryRequest(
+                user_id = userId,
+                vehicle_id = vehicleId.ifBlank { null },
+                driver_profile_id = driverProfileId.ifBlank { null },
+                query = query,
+                latitude = latitude,
+                longitude = longitude
+            )
+        )
+
+        if (!response.isSuccessful) {
+            Toast.makeText(
+                activity,
+                "Recomandarea AI nu a putut fi obtinuta: ${response.code()}",
+                Toast.LENGTH_SHORT
+            ).show()
+            return null
+        }
+
+        val body = response.body()
+        val candidate = body?.candidates?.firstOrNull()
+
+        if (candidate == null) {
+            Toast.makeText(
+                activity,
+                body?.message ?: "AI nu a gasit nicio recomandare pentru preferinte.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return null
+        }
+
+        RouteStopUi(
+            name = candidate.name,
+            address = candidate.address.orEmpty(),
+            lat = candidate.latitude,
+            lng = candidate.longitude
+        )
+    } catch (e: Exception) {
+        Toast.makeText(
+            activity,
+            "Recomandarea AI nu a putut fi obtinuta: ${e.message}",
+            Toast.LENGTH_SHORT
+        ).show()
+        null
     }
 }
 

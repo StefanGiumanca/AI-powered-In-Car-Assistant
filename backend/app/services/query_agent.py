@@ -300,7 +300,16 @@ def interpret_driver_query(query: str) -> QueryInterpretation:
     # Fuel / refill intent
     if contains_any_word(
         normalized,
-        ["refill", "fuel", "gas", "petrol", "diesel", "benzina", "motorina", "alimentez"],
+        [
+            "refill",
+            "fuel",
+            "gas",
+            "petrol",
+            "diesel",
+            "benzina",
+            "motorina",
+            "alimentez",
+        ],
     ):
         brand = extract_brand(normalized, FUEL_BRANDS)
 

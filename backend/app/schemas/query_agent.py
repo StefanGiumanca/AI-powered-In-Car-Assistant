@@ -17,8 +17,8 @@ class QueryInterpretation(BaseModel):
 
 class RecommendationQueryRequest(BaseModel):
     user_id: str
-    vehicle_id: str
-    driver_profile_id: str
+    vehicle_id: str | None = None
+    driver_profile_id: str | None = None
     query: str
 
     latitude: float

@@ -6,6 +6,8 @@ import com.example.davaroutes.data.GoogleLoginRequest
 import com.example.davaroutes.data.RegisterRequest
 import com.example.davaroutes.data.RegisterResponse
 import com.example.davaroutes.data.BootstrapResponse
+import com.example.davaroutes.data.RecommendationQueryRequest
+import com.example.davaroutes.data.RecommendationQueryResponse
 import com.example.davaroutes.data.RoutePreviewRequest
 import com.example.davaroutes.data.TripRequest
 import com.example.davaroutes.data.TripResponse
@@ -64,6 +66,11 @@ interface ApiService {
     suspend fun previewRoute(
         @Body trip: RoutePreviewRequest
     ): Response<TripResponse>
+
+    @POST("recommendations/driver-query")
+    suspend fun recommendFromDriverQuery(
+        @Body request: RecommendationQueryRequest
+    ): Response<RecommendationQueryResponse>
 
     @DELETE("vehicles/{vehicleId}")
     suspend fun deleteVehicle(
